@@ -1,4 +1,6 @@
-import { Request, Response } from "express";
+import { Request } from "express";
+import { Response } from "express";
+import { AuthRequest } from "../middlewares/auth.middleware";
 import { asyncHandler } from "../utils/asyncHandler";
 import { successResponse } from "../utils/apiResponse";
 import { registerUser } from "../services/auth.service";
@@ -28,7 +30,7 @@ export const login = asyncHandler(
   async (req: Request, res: Response) => {
     const { email, password } = req.body;
 
-    const user = await loginUser(
+    const { user, token } = await loginUser(
       email,
       password
     );
@@ -36,8 +38,24 @@ export const login = asyncHandler(
     return res.status(200).json(
       successResponse(
         "Login successful",
-        toUserResponse(user)
+        {
+          user: toUserResponse(user),
+          accessToken: token,
+        }
       )
     );
+  }
+);
+
+export const getProfile = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+
+    return res.status(200).json(
+      successResponse(
+        "Profile fetched successfully",
+        req.user
+      )
+    );
+
   }
 );
