@@ -9,11 +9,17 @@ const env = {
 
   API_VERSION: process.env.API_VERSION || "v1",
 
-  JWT_SECRET:
-    process.env.JWT_SECRET || "replace_with_a_secure_secret",
+  JWT_ACCESS_SECRET:
+  process.env.JWT_ACCESS_SECRET || "",
 
-  JWT_EXPIRES_IN:
-    process.env.JWT_EXPIRES_IN || "1d",
+  JWT_REFRESH_SECRET:
+    process.env.JWT_REFRESH_SECRET || "",
+
+  JWT_ACCESS_EXPIRES_IN:
+    process.env.JWT_ACCESS_EXPIRES_IN || "15m",
+
+  JWT_REFRESH_EXPIRES_IN:
+    process.env.JWT_REFRESH_EXPIRES_IN || "7d",
 
   DATABASE_URL:
     process.env.DATABASE_URL || "",

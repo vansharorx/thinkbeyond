@@ -4,6 +4,7 @@ import {
   register,
   login,
   getProfile,
+  refresh,
 } from "../controllers/auth.controller";
 
 import { validate } from "../middlewares/validation.middleware";
@@ -27,6 +28,11 @@ router.post(
   "/login",
   validate(loginSchema),
   login
+);
+
+router.post(
+  "/refresh",
+  refresh
 );
 
 router.get(

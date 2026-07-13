@@ -1,7 +1,8 @@
 import bcrypt from "bcrypt";
 import { AppError } from "../utils/AppError";
 import { createUser, findUserByEmail } from "../repositories/user.repository";
-import { generateToken } from "../utils/jwt";
+import { generateAccessToken, generateRefreshToken, } from "./jwt.service";
+import { createRefreshToken } from "../repositories/refreshToken.repository";
 
 const SALT_ROUNDS = 10;
 
@@ -49,13 +50,31 @@ export const loginUser = async (
     throw new AppError("Invalid email or password", 401);
   }
 
-  const token = generateToken({
+  const accessToken = generateAccessToken({
     userId: user.id,
     email: user.email,
   });
 
+  const refreshToken = generateRefreshToken({
+    userId: user.id,
+    email: user.email,
+  });
+
+  const refreshTokenExpiry = new Date();
+  refreshTokenExpiry.setDate(
+    refreshTokenExpiry.getDate() + 7
+  );
+
+  await createRefreshToken(
+    refreshToken,
+    user.id,
+    refreshTokenExpiry
+  );
+
   return {
     user,
-    token,
+    accessToken,
+    refreshToken,
   };
+  
 };

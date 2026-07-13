@@ -6,6 +6,7 @@ import { successResponse } from "../utils/apiResponse";
 import { registerUser } from "../services/auth.service";
 import { toUserResponse } from "../mappers/user.mapper";
 import { loginUser } from "../services/auth.service";
+import { refreshAccessToken } from "../services/refresh.service";
 
 export const register = asyncHandler(
   async (req: Request, res: Response) => {
@@ -30,7 +31,11 @@ export const login = asyncHandler(
   async (req: Request, res: Response) => {
     const { email, password } = req.body;
 
-    const { user, token } = await loginUser(
+    const {
+      user,
+      accessToken,
+      refreshToken,
+    } = await loginUser(
       email,
       password
     );
@@ -40,7 +45,8 @@ export const login = asyncHandler(
         "Login successful",
         {
           user: toUserResponse(user),
-          accessToken: token,
+          accessToken,
+          refreshToken,
         }
       )
     );
@@ -57,5 +63,24 @@ export const getProfile = asyncHandler(
       )
     );
 
+  }
+);
+
+export const refresh = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+
+    const { refreshToken } = req.body;
+
+    const accessToken =
+      await refreshAccessToken(refreshToken);
+
+    return res.status(200).json(
+      successResponse(
+        "Access token refreshed",
+        {
+          accessToken,
+        }
+      )
+    );
   }
 );
