@@ -1,11 +1,11 @@
-import { body } from "express-validator";
+import { Router } from "express";
+import { importRepository } from "../controllers/repository.controller";
 
-export const importRepositoryValidation = [
-  body("url")
-    .notEmpty()
-    .withMessage("Repository URL is required")
-    .isURL()
-    .withMessage("Invalid URL")
-    .matches(/^https:\/\/github\.com\/[^/]+\/[^/]+\/?$/)
-    .withMessage("Only valid GitHub repository URLs are allowed"),
-];
+const router = Router();
+
+router.post(
+  "/import",
+  importRepository
+);
+
+export default router;
