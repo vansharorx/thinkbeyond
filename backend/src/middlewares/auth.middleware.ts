@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { AppError } from "../utils/AppError";
-import { verifyToken } from "../utils/jwt";
+import { verifyAccessToken } from "../services/jwt.service";
 
 export interface AuthRequest extends Request {
   user?: {
@@ -26,7 +26,7 @@ export const authenticate = (
 
   const token = authHeader.split(" ")[1];
 
-  const payload = verifyToken(token);
+  const payload = verifyAccessToken(token);
 
   req.user = payload;
 
