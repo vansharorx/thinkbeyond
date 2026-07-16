@@ -1,5 +1,6 @@
 import { cloneRepository } from "./git.service";
 import { scanRepository } from "./scanner.service";
+import { generateManifest } from "./manifest.service";
 
 export const importRepositoryService = async (
   url: string
@@ -8,12 +9,16 @@ export const importRepositoryService = async (
   const repository =
     await cloneRepository(url);
 
+  const scan =
+  await scanRepository(repository.path);
+
   const manifest =
-    await scanRepository(repository.path);
+    await generateManifest(repository.path);
 
   return {
     repositoryId: repository.repositoryId,
-    ...manifest,
+    manifest,
+    scan,
   };
 
 };
