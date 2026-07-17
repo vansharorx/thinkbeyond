@@ -3,6 +3,8 @@ import { scanRepository } from "./scanner.service";
 import { generateManifest } from "./manifest.service";
 import { analyzeReadme } from "./readme.service";
 import { analyzePackage } from "./package-analyzer.service";
+import { detectArchitecture } from "./architecture.service";
+import { detectWorkspaces } from "./workspace.service";
 
 export const importRepositoryService = async (
   url: string
@@ -23,11 +25,22 @@ export const importRepositoryService = async (
   const packageAnalysis =
     await analyzePackage(repository.path);
 
+  const architecture =
+    await detectArchitecture(
+      repository.path,
+      scan.directories
+    );
+
+  const workspaces =
+    await detectWorkspaces(repository.path);
+
   return {
     repositoryId: repository.repositoryId,
     manifest,
     readme,
     packageAnalysis,
+    architecture,
+    workspaces,
     scan,
   };
 
