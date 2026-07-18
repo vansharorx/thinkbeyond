@@ -4,7 +4,8 @@ import { generateManifest } from "./manifest.service";
 import { analyzeReadme } from "./readme.service";
 import { analyzePackage } from "./package-analyzer.service";
 import { detectArchitecture } from "./architecture.service";
-import { detectWorkspaces } from "./workspace.service";
+import { analyzeWorkspaces } from "./workspace.service";
+import { generateRepositorySummary } from "./repository-summary.service";
 
 export const importRepositoryService = async (
   url: string
@@ -32,16 +33,16 @@ export const importRepositoryService = async (
     );
 
   const workspaces =
-    await detectWorkspaces(repository.path);
+    await analyzeWorkspaces(repository.path, scan.directories);
 
+  const summary =
+    generateRepositorySummary(workspaces);
+    
   return {
     repositoryId: repository.repositoryId,
-    manifest,
-    readme,
-    packageAnalysis,
-    architecture,
+    summary,
     workspaces,
-    scan,
+    scan
   };
 
 };
