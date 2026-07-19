@@ -5,6 +5,8 @@ import { generateManifest } from "./manifest.service";
 import { analyzeReadme } from "./readme.service";
 import { analyzePackage } from "./package-analyzer.service";
 import { detectArchitecture } from "./architecture.service";
+import { indexSourceFiles } from "./source-indexer.service";
+import { buildDependencyGraph } from "./dependency-graph.service";
 
 export interface WorkspaceAnalysis {
   name: string;
@@ -14,6 +16,8 @@ export interface WorkspaceAnalysis {
   readme: Awaited<ReturnType<typeof analyzeReadme>>;
   packageAnalysis: Awaited<ReturnType<typeof analyzePackage>>;
   architecture: Awaited<ReturnType<typeof detectArchitecture>>;
+  sourceFiles: Awaited<ReturnType<typeof indexSourceFiles>>;
+  dependencyGraph: ReturnType<typeof buildDependencyGraph>;
 }
 
 export const analyzeWorkspaces = async (
@@ -27,22 +31,32 @@ export const analyzeWorkspaces = async (
 
   for (const workspace of workspacePaths) {
 
+    const manifest = await generateManifest(workspace.path);
+
+    const readme = await analyzeReadme(workspace.path);
+
+    const packageAnalysis = await analyzePackage(workspace.path);
+
+    const architecture = await detectArchitecture(
+      workspace.path,
+      directories
+    );
+
+    const sourceFiles = await indexSourceFiles(workspace.path);
+
+    const dependencyGraph = buildDependencyGraph(sourceFiles);
+
     analyses.push({
       name: workspace.name,
       relativePath: workspace.relativePath,
 
-      manifest: await generateManifest(workspace.path),
-
-      readme: await analyzeReadme(workspace.path),
-
-      packageAnalysis: await analyzePackage(workspace.path),
-
-      architecture: await detectArchitecture(
-        workspace.path,
-        directories
-      ),
+      manifest,
+      readme,
+      packageAnalysis,
+      architecture,
+      sourceFiles,
+      dependencyGraph,
     });
-
   }
 
   return analyses;
@@ -111,17 +125,13 @@ async function detectWorkspacePaths(
           "dist",
           "build",
           ".next",
-          "coverage"
+          "coverage",
         ].includes(entry.name)
       ) {
         continue;
       }
 
-      await scan(
-        path.join(currentPath, entry.name)
-      );
+      await scan(path.join(currentPath, entry.name));
     }
-
   }
-
 }
