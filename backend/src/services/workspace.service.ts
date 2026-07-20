@@ -7,6 +7,8 @@ import { analyzePackage } from "./package-analyzer.service";
 import { detectArchitecture } from "./architecture.service";
 import { indexSourceFiles } from "./source-indexer.service";
 import { buildDependencyGraph } from "./dependency-graph.service";
+import { buildReverseDependencyGraph } from "./reverse-dependency.service";
+import { detectCircularDependencies } from "./circular-dependency.service";
 
 export interface WorkspaceAnalysis {
   name: string;
@@ -18,6 +20,8 @@ export interface WorkspaceAnalysis {
   architecture: Awaited<ReturnType<typeof detectArchitecture>>;
   sourceFiles: Awaited<ReturnType<typeof indexSourceFiles>>;
   dependencyGraph: ReturnType<typeof buildDependencyGraph>;
+  reverseDependencyGraph: ReturnType<typeof buildReverseDependencyGraph>;
+  circularDependencies: ReturnType<typeof detectCircularDependencies>;
 }
 
 export const analyzeWorkspaces = async (
@@ -46,6 +50,10 @@ export const analyzeWorkspaces = async (
 
     const dependencyGraph = buildDependencyGraph(sourceFiles);
 
+    const reverseDependencyGraph = buildReverseDependencyGraph(dependencyGraph);
+
+    const circularDependencies = detectCircularDependencies(dependencyGraph);
+
     analyses.push({
       name: workspace.name,
       relativePath: workspace.relativePath,
@@ -56,6 +64,8 @@ export const analyzeWorkspaces = async (
       architecture,
       sourceFiles,
       dependencyGraph,
+      reverseDependencyGraph,
+      circularDependencies,
     });
   }
 
