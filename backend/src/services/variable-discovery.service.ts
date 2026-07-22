@@ -1,5 +1,4 @@
 import ts from "typescript";
-import { parseTypeScriptFile } from "./ast-parser.service";
 
 export interface VariableInfo {
     name: string;
@@ -11,11 +10,9 @@ export interface VariableInfo {
     endLine: number;
 }
 
-export const discoverVariables = async (
-    filePath: string
-): Promise<VariableInfo[]> => {
-
-    const sourceFile = await parseTypeScriptFile(filePath);
+export const discoverVariables = (
+    sourceFile: ts.SourceFile
+): VariableInfo[] => {
 
     const variables: VariableInfo[] = [];
 

@@ -1,5 +1,4 @@
 import ts from "typescript";
-import { parseTypeScriptFile } from "./ast-parser.service";
 
 export interface ClassInfo {
     name: string;
@@ -11,11 +10,9 @@ export interface ClassInfo {
     endLine: number;
 }
 
-export const discoverClasses = async (
-    filePath: string
-): Promise<ClassInfo[]> => {
-
-    const sourceFile = await parseTypeScriptFile(filePath);
+export const discoverClasses = (
+    sourceFile: ts.SourceFile
+): ClassInfo[] => {
 
     const classes: ClassInfo[] = [];
 

@@ -1,5 +1,4 @@
 import ts from "typescript";
-import { parseTypeScriptFile } from "./ast-parser.service";
 
 export interface EnumInfo {
     name: string;
@@ -10,11 +9,9 @@ export interface EnumInfo {
     endLine: number;
 }
 
-export const discoverEnums = async (
-    filePath: string
-): Promise<EnumInfo[]> => {
-
-    const sourceFile = await parseTypeScriptFile(filePath);
+export const discoverEnums = (
+    sourceFile: ts.SourceFile
+): EnumInfo[] => {
 
     const enums: EnumInfo[] = [];
 

@@ -1,5 +1,4 @@
 import ts from "typescript";
-import { parseTypeScriptFile } from "./ast-parser.service";
 
 export interface FunctionInfo {
     name: string;
@@ -11,11 +10,9 @@ export interface FunctionInfo {
     endLine: number;
 }
 
-export const discoverFunctions = async (
-    filePath: string
-): Promise<FunctionInfo[]> => {
-
-    const sourceFile = await parseTypeScriptFile(filePath);
+export const discoverFunctions = (
+    sourceFile: ts.SourceFile
+): FunctionInfo[] => {
 
     const functions: FunctionInfo[] = [];
 

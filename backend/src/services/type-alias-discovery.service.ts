@@ -1,5 +1,5 @@
 import ts from "typescript";
-import { parseTypeScriptFile } from "./ast-parser.service";
+import { FunctionInfo } from "./function-discovery.service";
 
 export interface TypeAliasInfo {
     name: string;
@@ -10,11 +10,9 @@ export interface TypeAliasInfo {
     endLine: number;
 }
 
-export const discoverTypeAliases = async (
-    filePath: string
-): Promise<TypeAliasInfo[]> => {
-
-    const sourceFile = await parseTypeScriptFile(filePath);
+export const discoverTypeAliases = (
+    sourceFile: ts.SourceFile
+): TypeAliasInfo[] => {
 
     const aliases: TypeAliasInfo[] = [];
 
