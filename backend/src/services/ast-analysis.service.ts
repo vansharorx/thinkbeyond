@@ -16,6 +16,8 @@ import { VariableInfo } from "./variable-discovery.service";
 import { MethodInfo } from "./method-discovery.service";
 import { discoverMethods } from "./method-discovery.service";
 
+import { visitAST } from "./ast-visitor.service";
+
 export interface ASTAnalysis {
 
     functions: FunctionInfo[];
@@ -40,28 +42,6 @@ export const analyzeAST = async (
     const sourceFile =
         await parseTypeScriptFile(filePath);
 
-    return {
-
-        functions:
-            discoverFunctions(sourceFile),
-
-        classes:
-            discoverClasses(sourceFile),
-
-        interfaces:
-            discoverInterfaces(sourceFile),
-
-        enums:
-            discoverEnums(sourceFile),
-
-        typeAliases:
-            discoverTypeAliases(sourceFile),
-
-        variables:
-            discoverVariables(sourceFile),
-
-        methods:
-            discoverMethods(sourceFile),
-    };
+    return visitAST(sourceFile);
 
 };
