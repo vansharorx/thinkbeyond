@@ -1,5 +1,4 @@
 import ts from "typescript";
-import { FunctionInfo } from "./function-discovery.service";
 
 export interface TypeAliasInfo {
     name: string;
