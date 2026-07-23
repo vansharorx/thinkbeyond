@@ -13,6 +13,8 @@ import { InterfaceInfo } from "./interface-discovery.service";
 import { EnumInfo } from "./enum-discovery.service";
 import { TypeAliasInfo } from "./type-alias-discovery.service";
 import { VariableInfo } from "./variable-discovery.service";
+import { MethodInfo } from "./method-discovery.service";
+import { discoverMethods } from "./method-discovery.service";
 
 export interface ASTAnalysis {
 
@@ -28,6 +30,7 @@ export interface ASTAnalysis {
 
     variables: VariableInfo[];
 
+    methods: MethodInfo[];
 }
 
 export const analyzeAST = async (
@@ -57,6 +60,8 @@ export const analyzeAST = async (
         variables:
             discoverVariables(sourceFile),
 
+        methods:
+            discoverMethods(sourceFile),
     };
 
 };
