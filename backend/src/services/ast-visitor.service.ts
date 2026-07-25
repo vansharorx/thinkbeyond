@@ -329,6 +329,46 @@ export const visitAST = (
 
         }
 
+        if (ts.isTypeAliasDeclaration(node)) {
+
+            const start =
+                sourceFile.getLineAndCharacterOfPosition(
+                    node.getStart()
+                );
+
+            const end =
+                sourceFile.getLineAndCharacterOfPosition(
+                    node.getEnd()
+                );
+
+            analysis.typeAliases.push({
+
+                name: node.name.text,
+
+                exported:
+                    node.modifiers?.some(
+                        modifier =>
+                            modifier.kind ===
+                            ts.SyntaxKind.ExportKeyword
+                    ) ?? false,
+
+                generics:
+                    node.typeParameters?.map(
+                        parameter => parameter.name.text
+                    ) ?? [],
+
+                definition:
+                    node.type.getText(sourceFile),
+
+                startLine:
+                    start.line + 1,
+
+                endLine:
+                    end.line + 1,
+
+            });
+        }
+
         ts.forEachChild(
             node,
             visit
