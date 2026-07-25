@@ -251,7 +251,7 @@ export const visitAST = (
                     .map(member =>
                         member.name.getText(sourceFile)
                     );
-                    
+
             analysis.interfaces.push({
 
                 name:
@@ -270,6 +270,54 @@ export const visitAST = (
                 properties,
 
                 methods,
+
+                startLine:
+                    start.line + 1,
+
+                endLine:
+                    end.line + 1,
+
+            });
+
+        }
+
+        if (ts.isEnumDeclaration(node)) {
+
+            const start =
+                sourceFile.getLineAndCharacterOfPosition(
+                    node.getStart()
+                );
+
+            const end =
+                sourceFile.getLineAndCharacterOfPosition(
+                    node.getEnd()
+                );
+
+            const members =
+                node.members.map(member =>
+                    member.name.getText(sourceFile)
+                );
+
+            analysis.enums.push({
+
+                name:
+                    node.name.text,
+
+                exported:
+                    node.modifiers?.some(
+                        modifier =>
+                            modifier.kind ===
+                            ts.SyntaxKind.ExportKeyword
+                    ) ?? false,
+
+                const:
+                    node.modifiers?.some(
+                        modifier =>
+                            modifier.kind ===
+                            ts.SyntaxKind.ConstKeyword
+                    ) ?? false,
+
+                members,
 
                 startLine:
                     start.line + 1,
