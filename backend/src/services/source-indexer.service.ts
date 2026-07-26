@@ -5,6 +5,7 @@ import { analyzeImports } from "./import-analyzer.service";
 import { ImportInfo } from "./import-analyzer.service";
 import { ExportInfo } from "./export-analyzer.service";
 import { analyzeExports } from "./export-analyzer.service";
+import { analyzeAST, ASTAnalysis } from "./ast-analysis.service";
 
 export interface SourceFile {
     relativePath: string;
@@ -14,6 +15,8 @@ export interface SourceFile {
 
     imports: ImportInfo[];
     exports: ExportInfo[];
+
+    ast: ASTAnalysis | null;
 }
 
 const SOURCE_EXTENSIONS = [
@@ -76,6 +79,13 @@ export const indexSourceFiles = async (
         "utf-8"
       );
 
+      let ast: ASTAnalysis | null = null;
+      if (
+          [".ts", ".tsx", ".js", ".jsx"].includes(extension)
+      ) {
+          ast = await analyzeAST(fullPath);
+      }
+
       files.push({
         relativePath: path
             .relative(workspacePath, fullPath)
@@ -83,9 +93,12 @@ export const indexSourceFiles = async (
         extension,
         size: stats.size,
         lines: content.split("\n").length,
-        imports: await analyzeImports(fullPath),
-        exports: await analyzeExports(fullPath),
-      });
+        imports:
+            await analyzeImports(fullPath),
+        exports:
+            await analyzeExports(fullPath),
+        ast,
+    });
 
     }
 

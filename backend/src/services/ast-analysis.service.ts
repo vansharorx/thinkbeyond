@@ -1,38 +1,22 @@
 import { parseTypeScriptFile } from "./ast-parser.service";
-
-import { discoverFunctions } from "./function-discovery.service";
-import { discoverClasses } from "./class-discovery.service";
-import { discoverInterfaces } from "./interface-discovery.service";
-import { discoverEnums } from "./enum-discovery.service";
-import { discoverTypeAliases } from "./type-alias-discovery.service";
-import { discoverVariables } from "./variable-discovery.service";
-
-import { FunctionInfo } from "./function-discovery.service";
-import { ClassInfo } from "./class-discovery.service";
-import { InterfaceInfo } from "./interface-discovery.service";
-import { EnumInfo } from "./enum-discovery.service";
-import { TypeAliasInfo } from "./type-alias-discovery.service";
-import { VariableInfo } from "./variable-discovery.service";
-import { MethodInfo } from "./method-discovery.service";
-import { discoverMethods } from "./method-discovery.service";
-
 import { visitAST } from "./ast-visitor.service";
 
+import type { FunctionInfo } from "./function-discovery.service";
+import type { ClassInfo } from "./class-discovery.service";
+import type { InterfaceInfo } from "./interface-discovery.service";
+import type { EnumInfo } from "./enum-discovery.service";
+import type { TypeAliasInfo } from "./type-alias-discovery.service";
+import type { VariableInfo } from "./variable-discovery.service";
+import type { MethodInfo } from "./method-discovery.service";
+
 export interface ASTAnalysis {
-
     functions: FunctionInfo[];
-
     classes: ClassInfo[];
-
-    interfaces: InterfaceInfo[];
-
-    enums: EnumInfo[];
-
-    typeAliases: TypeAliasInfo[];
-
-    variables: VariableInfo[];
-
     methods: MethodInfo[];
+    interfaces: InterfaceInfo[];
+    enums: EnumInfo[];
+    typeAliases: TypeAliasInfo[];
+    variables: VariableInfo[];
 }
 
 export const analyzeAST = async (
@@ -43,5 +27,4 @@ export const analyzeAST = async (
         await parseTypeScriptFile(filePath);
 
     return visitAST(sourceFile);
-
 };
