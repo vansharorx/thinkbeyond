@@ -1,14 +1,5 @@
 import ts from "typescript";
-
-export interface InterfaceInfo {
-    name: string;
-    exported: boolean;
-    extends: string[];
-    properties: string[];
-    methods: string[];
-    startLine: number;
-    endLine: number;
-}
+import type { InterfaceInfo } from "../types/ast.types";
 
 export const discoverInterfaces = (
     sourceFile: ts.SourceFile

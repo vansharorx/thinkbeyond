@@ -5,7 +5,8 @@ import { analyzeImports } from "./import-analyzer.service";
 import { ImportInfo } from "./import-analyzer.service";
 import { ExportInfo } from "./export-analyzer.service";
 import { analyzeExports } from "./export-analyzer.service";
-import { analyzeAST, ASTAnalysis } from "./ast-analysis.service";
+import { analyzeAST } from "./ast-analysis.service";
+import type { ASTAnalysis } from "../types/ast.types";
 
 export interface SourceFile {
     relativePath: string;

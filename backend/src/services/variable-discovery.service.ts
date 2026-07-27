@@ -1,14 +1,5 @@
 import ts from "typescript";
-
-export interface VariableInfo {
-    name: string;
-    kind: "const" | "let" | "var";
-    exported: boolean;
-    type: string | null;
-    initializer: string | null;
-    startLine: number;
-    endLine: number;
-}
+import type { VariableInfo } from "../types/ast.types";
 
 export const discoverVariables = (
     sourceFile: ts.SourceFile

@@ -1,14 +1,5 @@
 import ts from "typescript";
-
-export interface FunctionInfo {
-    name: string;
-    async: boolean;
-    exported: boolean;
-    parameters: string[];
-    returnType: string | null;
-    startLine: number;
-    endLine: number;
-}
+import type { FunctionInfo } from "../types/ast.types";
 
 export const discoverFunctions = (
     sourceFile: ts.SourceFile

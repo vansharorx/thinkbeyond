@@ -1,13 +1,5 @@
 import ts from "typescript";
-
-export interface EnumInfo {
-    name: string;
-    exported: boolean;
-    const: boolean;
-    members: string[];
-    startLine: number;
-    endLine: number;
-}
+import type { EnumInfo } from "../types/ast.types";
 
 export const discoverEnums = (
     sourceFile: ts.SourceFile

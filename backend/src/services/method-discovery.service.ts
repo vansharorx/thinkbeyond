@@ -1,26 +1,5 @@
 import ts from "typescript";
-
-export interface MethodInfo {
-
-    name: string;
-
-    visibility: "public" | "protected" | "private";
-
-    static: boolean;
-
-    async: boolean;
-
-    abstract: boolean;
-
-    parameters: string[];
-
-    returnType: string | null;
-
-    startLine: number;
-
-    endLine: number;
-
-}
+import type { MethodInfo } from "../types/ast.types";
 
 export const discoverMethods = (
 

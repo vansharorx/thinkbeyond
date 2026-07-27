@@ -1,13 +1,5 @@
 import ts from "typescript";
-
-export interface TypeAliasInfo {
-    name: string;
-    exported: boolean;
-    generics: string[];
-    definition: string;
-    startLine: number;
-    endLine: number;
-}
+import type { TypeAliasInfo } from "../types/ast.types";
 
 export const discoverTypeAliases = (
     sourceFile: ts.SourceFile

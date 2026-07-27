@@ -1,14 +1,6 @@
 import ts from "typescript";
+import type { ClassInfo } from "../types/ast.types";
 
-export interface ClassInfo {
-    name: string;
-    exported: boolean;
-    abstract: boolean;
-    extends: string | null;
-    implements: string[];
-    startLine: number;
-    endLine: number;
-}
 
 export const discoverClasses = (
     sourceFile: ts.SourceFile
