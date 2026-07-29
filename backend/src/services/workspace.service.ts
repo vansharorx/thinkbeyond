@@ -9,6 +9,10 @@ import { indexSourceFiles } from "./source-indexer.service";
 import { buildDependencyGraph } from "./dependency-graph.service";
 import { buildReverseDependencyGraph } from "./reverse-dependency.service";
 import { detectCircularDependencies } from "./circular-dependency.service";
+import {
+  buildGlobalSymbolTable,
+  type GlobalSymbolInfo,
+} from "./global-symbol-table.service";
 
 export interface WorkspaceAnalysis {
   name: string;
@@ -19,6 +23,9 @@ export interface WorkspaceAnalysis {
   packageAnalysis: Awaited<ReturnType<typeof analyzePackage>>;
   architecture: Awaited<ReturnType<typeof detectArchitecture>>;
   sourceFiles: Awaited<ReturnType<typeof indexSourceFiles>>;
+
+  globalSymbolTable: Map<string, GlobalSymbolInfo>;
+
   dependencyGraph: ReturnType<typeof buildDependencyGraph>;
   reverseDependencyGraph: ReturnType<typeof buildReverseDependencyGraph>;
   circularDependencies: ReturnType<typeof detectCircularDependencies>;
@@ -48,6 +55,9 @@ export const analyzeWorkspaces = async (
 
     const sourceFiles = await indexSourceFiles(workspace.path);
 
+    const globalSymbolTable =
+      buildGlobalSymbolTable(sourceFiles);
+
     const dependencyGraph = buildDependencyGraph(sourceFiles);
 
     const reverseDependencyGraph = buildReverseDependencyGraph(dependencyGraph);
@@ -63,6 +73,9 @@ export const analyzeWorkspaces = async (
       packageAnalysis,
       architecture,
       sourceFiles,
+
+      globalSymbolTable,
+
       dependencyGraph,
       reverseDependencyGraph,
       circularDependencies,
