@@ -6,6 +6,7 @@ import { analyzePackage } from "./package-analyzer.service";
 import { detectArchitecture } from "./architecture.service";
 import { analyzeWorkspaces } from "./workspace.service";
 import { generateRepositorySummary } from "./repository-summary.service";
+import { buildRepositoryKnowledge } from "./repository-knowledge.service";
 
 export const importRepositoryService = async (
   url: string
@@ -38,9 +39,13 @@ export const importRepositoryService = async (
   const summary =
     generateRepositorySummary(workspaces);
     
+  const knowledge =
+    buildRepositoryKnowledge(workspaces);
+
   return {
     repositoryId: repository.repositoryId,
     summary,
+    knowledge,
     workspaces,
     scan
   };
