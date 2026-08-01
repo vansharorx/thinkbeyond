@@ -1,7 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 
-import { analyzeImports, ImportInfo } from "./import-analyzer.service";
+import { analyzeImportsAST, type ImportInfo} from "./import-ast.service";
 import { analyzeExports, ExportInfo } from "./export-analyzer.service";
 import { analyzeAST } from "./ast-analysis.service";
 import type { ASTAnalysis } from "../types/ast.types";
@@ -105,7 +105,7 @@ export const indexSourceFiles = async (
                 size: stats.size,
                 lines: content.split("\n").length,
 
-                imports: await analyzeImports(fullPath),
+                imports: await analyzeImportsAST(fullPath),
                 exports: await analyzeExports(fullPath),
 
                 ast,
