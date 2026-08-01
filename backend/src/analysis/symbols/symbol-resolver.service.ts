@@ -1,4 +1,4 @@
-import { SourceFile } from "./source-indexer.service";
+import { SourceFile } from "../../services/source-indexer.service";
 import { GlobalSymbolInfo } from "./global-symbol-table.service";
 
 export interface ResolvedImport {

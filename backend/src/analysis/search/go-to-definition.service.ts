@@ -1,5 +1,5 @@
-import { WorkspaceAnalysis } from "./workspace.service";
-import { GlobalSymbolInfo } from "./global-symbol-table.service";
+import { WorkspaceAnalysis } from "../../services/workspace.service";
+import { GlobalSymbolInfo } from "../symbols/global-symbol-table.service";
 
 export interface DefinitionResult {
 

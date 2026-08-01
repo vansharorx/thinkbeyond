@@ -1,4 +1,4 @@
-import type { ASTAnalysis } from "../types/ast.types";
+import type { ASTAnalysis } from "../../types/ast.types";
 
 export interface SymbolInfo {
     name: string;

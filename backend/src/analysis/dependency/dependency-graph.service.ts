@@ -1,5 +1,5 @@
 import path from "path";
-import { SourceFile } from "./source-indexer.service";
+import { SourceFile } from "../../services/source-indexer.service";
 
 export interface DependencyNode {
   file: string;

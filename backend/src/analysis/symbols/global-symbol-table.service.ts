@@ -1,4 +1,4 @@
-import { SourceFile } from "./source-indexer.service";
+import { SourceFile } from "../../services/source-indexer.service";
 import {
     SymbolInfo,
 } from "./symbol-table.service";

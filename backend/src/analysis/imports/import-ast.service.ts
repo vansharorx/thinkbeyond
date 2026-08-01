@@ -1,5 +1,5 @@
 import ts from "typescript";
-import { parseTypeScriptFile } from "./ast-parser.service";
+import { parseTypeScriptFile } from "../ast/ast-parser.service";
 
 export interface ImportedSymbol {
     imported: string;

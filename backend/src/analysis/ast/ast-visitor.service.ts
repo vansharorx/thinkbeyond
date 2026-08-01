@@ -1,5 +1,5 @@
 import ts from "typescript";
-import type { ASTAnalysis } from "../types/ast.types";
+import type { ASTAnalysis } from "../../types/ast.types";
 
 export const visitAST = (
     sourceFile: ts.SourceFile

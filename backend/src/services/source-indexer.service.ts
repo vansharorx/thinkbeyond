@@ -1,15 +1,15 @@
 import fs from "fs/promises";
 import path from "path";
 
-import { analyzeImportsAST, type ImportInfo} from "./import-ast.service";
-import { analyzeExports, ExportInfo } from "./export-analyzer.service";
-import { analyzeAST } from "./ast-analysis.service";
+import { analyzeImportsAST, type ImportInfo} from "../analysis/imports/import-ast.service";
+import { analyzeExports, ExportInfo } from "../analysis/exports/export-analyzer.service";
+import { analyzeAST } from "../analysis/ast/ast-analysis.service";
 import type { ASTAnalysis } from "../types/ast.types";
 
 import {
     buildSymbolTable,
     type SymbolInfo,
-} from "./symbol-table.service";
+} from "../analysis/symbols/symbol-table.service";
 
 export interface SourceFile {
     relativePath: string;

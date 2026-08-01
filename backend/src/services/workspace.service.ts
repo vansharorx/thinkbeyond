@@ -6,13 +6,13 @@ import { analyzeReadme } from "./readme.service";
 import { analyzePackage } from "./package-analyzer.service";
 import { detectArchitecture } from "./architecture.service";
 import { indexSourceFiles } from "./source-indexer.service";
-import { buildDependencyGraph } from "./dependency-graph.service";
-import { buildReverseDependencyGraph } from "./reverse-dependency.service";
-import { detectCircularDependencies } from "./circular-dependency.service";
+import { buildDependencyGraph } from "../analysis/dependency/dependency-graph.service";
+import { buildReverseDependencyGraph } from "../analysis/dependency/reverse-dependency.service";
+import { detectCircularDependencies } from "../analysis/dependency/circular-dependency.service";
 import {
   buildGlobalSymbolTable,
   type GlobalSymbolInfo,
-} from "./global-symbol-table.service";
+} from "../analysis/symbols/global-symbol-table.service";
 
 export interface WorkspaceAnalysis {
   name: string;

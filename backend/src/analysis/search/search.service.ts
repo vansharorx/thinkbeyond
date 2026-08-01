@@ -1,4 +1,4 @@
-import { WorkspaceAnalysis } from "./workspace.service";
+import { WorkspaceAnalysis } from "../../services/workspace.service";
 
 export interface SearchResult {
     workspace: string;
