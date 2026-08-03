@@ -76,4 +76,10 @@ export interface ASTAnalysis {
   enums: EnumInfo[];
   typeAliases: TypeAliasInfo[];
   variables: VariableInfo[];
+  functionCalls: FunctionCallInfo[];
+}
+
+export interface FunctionCallInfo {
+  caller: string;
+  callee: string;
 }

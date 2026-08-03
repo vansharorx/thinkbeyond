@@ -8,6 +8,7 @@ import { discoverEnums } from "./discoveries/enum-discovery.service";
 import { discoverMethods } from "./discoveries/method-discovery.service";
 import { discoverVariables } from "./discoveries/variable-discovery.service";
 import { discoverTypeAliases } from "./discoveries/type-alias-discovery.service";
+import { discoverFunctionCalls } from "./discoveries/function-call-discovery.service";
 
 import type { VisitorContext } from "./visitors/visitor-context";
 
@@ -24,6 +25,7 @@ export const visitAST = (
         enums: [],
         typeAliases: [],
         variables: [],
+        functionCalls: [],
 
     };
 
@@ -47,7 +49,8 @@ export const visitAST = (
         discoverMethods(node, sourceFile, context);
         discoverVariables(node, sourceFile, context);
         discoverTypeAliases(node, sourceFile, context);
-
+        discoverFunctionCalls(node, context);
+        
         if (ts.isFunctionDeclaration(node)) {
             context.currentFunction =
                 node.name?.text ?? "anonymous";
