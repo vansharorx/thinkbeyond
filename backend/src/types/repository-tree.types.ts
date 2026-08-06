@@ -4,7 +4,13 @@ export interface RepositoryNode {
 
     path: string;
 
+    depth: number;
+
     type: "file" | "directory";
+
+    extension?: string;
+
+    size?: number;
 
     children?: RepositoryNode[];
 

@@ -7,6 +7,7 @@ import { detectArchitecture } from "./architecture.service";
 import { analyzeWorkspaces } from "./workspace.service";
 import { generateRepositorySummary } from "./repository-summary.service";
 import { buildRepositoryKnowledge } from "./repository-knowledge.service";
+import { saveRepositoryExplorerState } from "./repository-explorer-state.service";
 
 export const importRepositoryService = async (
   url: string
@@ -41,6 +42,19 @@ export const importRepositoryService = async (
     
   const knowledge =
     buildRepositoryKnowledge(workspaces);
+
+  const {
+    analyzeImpact: _analyzeImpact,
+    ...knowledgeSnapshot
+  } = knowledge;
+
+  await saveRepositoryExplorerState({
+    repositoryId: repository.repositoryId,
+    repositoryPath: repository.path,
+    summary,
+    knowledge: knowledgeSnapshot,
+    workspaces,
+  });
 
   return {
     repositoryId: repository.repositoryId,
