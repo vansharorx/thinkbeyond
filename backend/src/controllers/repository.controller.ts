@@ -9,6 +9,11 @@ import { getRepositoryFileDetails } from "../services/repository-file.service";
 import { getSymbolDetails } from "../services/symbol-explorer.service";
 import { searchRepositoryData } from "../services/repository-search.service";
 import { getRepositoryOverview as loadRepositoryOverview } from "../services/repository-overview.service";
+import { chatRepository } from "../ai/chat/repository-chat.service";
+import { explainFile } from "../ai/chat/explain-file.service";
+import { explainSymbol } from "../ai/chat/explain-symbol.service";
+import { reviewArchitecture } from "../ai/chat/architecture-review.service";
+import { generateDocumentation } from "../ai/chat/documentation.service";
 
 export const importRepository = asyncHandler(
   async (req: Request, res: Response) => {
@@ -142,6 +147,91 @@ export const getRepositoryOverview = asyncHandler(
 
     return res.json(
       successResponse("Repository overview loaded successfully", overview)
+    );
+  }
+);
+
+export const chatWithRepository = asyncHandler(
+  async (req: Request, res: Response) => {
+    const repositoryId = firstString(req.params.id);
+    const question = firstOptionalString(req.body?.question) ?? "";
+
+    const result = await chatRepository(repositoryId, question);
+
+    if (!result) {
+      throw new AppError("Repository not found", 404);
+    }
+
+    return res.json(
+      successResponse("Repository chat completed successfully", result)
+    );
+  }
+);
+
+export const explainRepositoryFile = asyncHandler(
+  async (req: Request, res: Response) => {
+    const repositoryId = firstString(req.params.id);
+    const filePath = firstOptionalString(req.body?.filePath) ?? firstOptionalString(req.query.path) ?? "";
+
+    const result = await explainFile(repositoryId, filePath);
+
+    if (!result) {
+      throw new AppError("File not found", 404);
+    }
+
+    return res.json(
+      successResponse("File explanation completed successfully", result)
+    );
+  }
+);
+
+export const explainRepositorySymbol = asyncHandler(
+  async (req: Request, res: Response) => {
+    const repositoryId = firstString(req.params.id);
+    const symbolName = firstOptionalString(req.body?.symbolName) ?? firstOptionalString(req.query.name) ?? "";
+    const matchMode = firstOptionalString(req.body?.matchMode) === "partial" ? "partial" : "exact";
+
+    const result = await explainSymbol(repositoryId, symbolName, matchMode);
+
+    if (!result) {
+      throw new AppError("Symbol not found", 404);
+    }
+
+    return res.json(
+      successResponse("Symbol explanation completed successfully", result)
+    );
+  }
+);
+
+export const reviewRepositoryArchitecture = asyncHandler(
+  async (req: Request, res: Response) => {
+    const repositoryId = firstString(req.params.id);
+
+    const result = await reviewArchitecture(repositoryId);
+
+    if (!result) {
+      throw new AppError("Repository not found", 404);
+    }
+
+    return res.json(
+      successResponse("Architecture review completed successfully", result)
+    );
+  }
+);
+
+export const generateRepositoryDocumentation = asyncHandler(
+  async (req: Request, res: Response) => {
+    const repositoryId = firstString(req.params.id);
+    const scope = firstOptionalString(req.body?.scope) as "repository" | "architecture" | "api" | "module" | undefined;
+
+    const result = await generateDocumentation(repositoryId, scope ?? "repository");
+
+    if (!result) {
+      throw new AppError("Repository not found", 404);
+    }
+
+    return res.json(
+      successResponse("Documentation generated successfully", result)
     );
   }
 );

@@ -6,6 +6,11 @@ import {
   getRepositorySymbol,
   searchRepository,
   getRepositoryOverview,
+  chatWithRepository,
+  explainRepositoryFile,
+  explainRepositorySymbol,
+  reviewRepositoryArchitecture,
+  generateRepositoryDocumentation,
 } from "../controllers/repository.controller";
 
 const router = Router();
@@ -38,6 +43,31 @@ router.get(
 router.get(
   "/:id/overview",
   getRepositoryOverview
+);
+
+router.post(
+  "/:id/chat",
+  chatWithRepository
+);
+
+router.post(
+  "/:id/explain/file",
+  explainRepositoryFile
+);
+
+router.post(
+  "/:id/explain/symbol",
+  explainRepositorySymbol
+);
+
+router.post(
+  "/:id/review",
+  reviewRepositoryArchitecture
+);
+
+router.post(
+  "/:id/documentation",
+  generateRepositoryDocumentation
 );
 
 export default router;

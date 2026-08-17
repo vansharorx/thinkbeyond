@@ -27,8 +27,29 @@ const env = {
   REDIS_URL:
     process.env.REDIS_URL || "",
 
+  AI_PROVIDER:
+    process.env.AI_PROVIDER || "",
+
+  OPENAI_API_KEY:
+    process.env.OPENAI_API_KEY || "",
+
+  OPENAI_BASE_URL:
+    process.env.OPENAI_BASE_URL || "",
+
+  OPENAI_MODEL:
+    process.env.OPENAI_MODEL || "",
+
   GEMINI_API_KEY:
-    process.env.GEMINI_API_KEY || ""
+    process.env.GEMINI_API_KEY || "",
+
+  GEMINI_MODEL:
+    process.env.GEMINI_MODEL || "",
+
+  OLLAMA_BASE_URL:
+    process.env.OLLAMA_BASE_URL || "",
+
+  OLLAMA_MODEL:
+    process.env.OLLAMA_MODEL || ""
 };
 
 export default env;
