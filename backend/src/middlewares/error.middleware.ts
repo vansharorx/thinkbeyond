@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { AppError } from "../utils/AppError";
+import { AIProviderError } from "../ai/providers/provider.interface";
 
 export const errorHandler = (
   err: Error,
@@ -10,6 +11,13 @@ export const errorHandler = (
   if (err instanceof AppError) {
     return res.status(err.statusCode).json({
       success: err.success,
+      message: err.message,
+    });
+  }
+
+  if (err instanceof AIProviderError) {
+    return res.status(err.statusCode).json({
+      success: false,
       message: err.message,
     });
   }

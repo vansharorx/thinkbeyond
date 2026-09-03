@@ -30,6 +30,9 @@ const env = {
   AI_PROVIDER:
     process.env.AI_PROVIDER || "",
 
+  AI_TIMEOUT_MS:
+    Number(process.env.AI_TIMEOUT_MS) || 60000,
+
   OPENAI_API_KEY:
     process.env.OPENAI_API_KEY || "",
 
