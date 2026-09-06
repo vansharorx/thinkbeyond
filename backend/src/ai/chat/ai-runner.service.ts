@@ -5,6 +5,12 @@ import env from "../../config/env";
 
 export interface AiRunResult {
   provider: string;
+  model?: string;
+  usage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    totalTokens?: number;
+  };
   systemPrompt: string;
   userPrompt: string;
   prompt: string;
@@ -23,6 +29,8 @@ export const runAiTask = async (
 
     return {
       provider: response.provider || provider.name,
+      model: response.model,
+      usage: response.usage,
       systemPrompt: bundle.systemPrompt,
       userPrompt: bundle.userPrompt,
       prompt: bundle.prompt,

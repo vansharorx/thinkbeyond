@@ -1,6 +1,6 @@
 import { loadRepositoryExplorerState } from "../../services/repository-explorer-state.service";
-import { buildAiContext } from "../context/context-builder.service";
-import { runAiTask } from "./ai-runner.service";
+import { runRepositoryIntelligence } from "../intelligence/intelligence-orchestrator.service";
+import type { EvidenceItem, IntelligenceMetadata } from "../intelligence/intelligence.types";
 
 export interface ArchitectureReviewResponse {
   repositoryId: string;
@@ -24,6 +24,8 @@ export interface ArchitectureReviewResponse {
       dependencyPenalty: number;
     };
   };
+  evidence: EvidenceItem[];
+  metadata: IntelligenceMetadata;
 }
 
 export const reviewArchitecture = async (
@@ -34,13 +36,17 @@ export const reviewArchitecture = async (
     return null;
   }
 
-  const context = await buildAiContext(state);
-  const prompt = await runAiTask("architectureReview", context.repository);
+  const intelligence = await runRepositoryIntelligence({
+    repositoryId,
+    task: "Review the repository architecture.",
+    template: "architectureReview",
+  });
+  if (!intelligence) return null;
 
   return {
     repositoryId,
-    provider: prompt.provider,
-    summary: prompt.content,
+    provider: intelligence.provider,
+    summary: intelligence.answer,
     layering: reviewLayering(state),
     circularDependencies: state.workspaces.flatMap(workspace => workspace.circularDependencies.cycles.map(cycle => cycle.cycle)),
     deadCode: state.knowledge.deadCode,
@@ -48,6 +54,8 @@ export const reviewArchitecture = async (
     largeFiles: collectLargeFiles(state),
     largeFunctions: collectLargeFunctions(state),
     health: state.knowledge.health,
+    evidence: intelligence.evidence,
+    metadata: intelligence.metadata,
   };
 };
 

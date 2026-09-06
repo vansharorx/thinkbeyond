@@ -1,5 +1,6 @@
 import { loadRepositoryExplorerState } from "../../services/repository-explorer-state.service";
-import { runAiTask } from "./ai-runner.service";
+import { runRepositoryIntelligence } from "../intelligence/intelligence-orchestrator.service";
+import type { EvidenceItem, IntelligenceMetadata } from "../intelligence/intelligence.types";
 
 export interface DocumentationResponse {
   repositoryId: string;
@@ -8,6 +9,8 @@ export interface DocumentationResponse {
   architectureMarkdown: string;
   apiMarkdown: string;
   moduleMarkdown: string;
+  evidence: EvidenceItem[];
+  metadata: IntelligenceMetadata;
 }
 
 export const generateDocumentation = async (
@@ -19,7 +22,7 @@ export const generateDocumentation = async (
     return null;
   }
 
-  const prompt = await runAiTask("generateDocumentation", {
+  const documentationContext = {
     summary: state.summary,
     knowledge: state.knowledge,
     workspaces: state.workspaces.map(workspace => ({
@@ -28,20 +31,29 @@ export const generateDocumentation = async (
       fileCount: workspace.sourceFiles.length,
     })),
     scope,
+  };
+  const intelligence = await runRepositoryIntelligence({
+    repositoryId,
+    task: `Generate ${scope} documentation.`,
+    template: "generateDocumentation",
+    context: documentationContext,
   });
+  if (!intelligence) return null;
 
-  const repositoryMarkdown = buildRepositoryMarkdown(state, prompt.content);
-  const architectureMarkdown = buildArchitectureMarkdown(state, prompt.content);
-  const apiMarkdown = buildApiMarkdown(state, prompt.content);
-  const moduleMarkdown = buildModuleMarkdown(state, prompt.content);
+  const repositoryMarkdown = buildRepositoryMarkdown(state, intelligence.answer);
+  const architectureMarkdown = buildArchitectureMarkdown(state, intelligence.answer);
+  const apiMarkdown = buildApiMarkdown(state, intelligence.answer);
+  const moduleMarkdown = buildModuleMarkdown(state, intelligence.answer);
 
   return {
     repositoryId,
-    provider: prompt.provider,
+    provider: intelligence.provider,
     repositoryMarkdown,
     architectureMarkdown,
     apiMarkdown,
     moduleMarkdown,
+    evidence: intelligence.evidence,
+    metadata: intelligence.metadata,
   };
 };
 

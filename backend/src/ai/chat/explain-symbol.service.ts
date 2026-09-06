@@ -1,6 +1,6 @@
-import { loadRepositoryExplorerState } from "../../services/repository-explorer-state.service";
 import { buildSymbolContext } from "../context/symbol-context.service";
-import { runAiTask } from "./ai-runner.service";
+import { runRepositoryIntelligence } from "../intelligence/intelligence-orchestrator.service";
+import type { EvidenceItem, IntelligenceMetadata } from "../intelligence/intelligence.types";
 
 export interface ExplainSymbolResponse {
   repositoryId: string;
@@ -8,6 +8,8 @@ export interface ExplainSymbolResponse {
   symbol: NonNullable<ReturnType<typeof buildSymbolContext>>;
   summary: string;
   impact: NonNullable<ReturnType<typeof buildSymbolContext>>["impact"];
+  evidence: EvidenceItem[];
+  metadata: IntelligenceMetadata;
 }
 
 export const explainSymbol = async (
@@ -15,23 +17,23 @@ export const explainSymbol = async (
   symbolName: string,
   matchMode: "exact" | "partial" = "exact"
 ): Promise<ExplainSymbolResponse | null> => {
-  const state = await loadRepositoryExplorerState(repositoryId);
-  if (!state) {
-    return null;
-  }
-
-  const symbol = buildSymbolContext(state, symbolName, matchMode);
-  if (!symbol) {
-    return null;
-  }
-
-  const prompt = await runAiTask("explainSymbol", symbol, symbolName);
+  const intelligence = await runRepositoryIntelligence({
+    repositoryId,
+    task: `Explain symbol ${symbolName}`,
+    template: "explainSymbol",
+    symbolName,
+    matchMode,
+  });
+  if (!intelligence || !intelligence.structuredContext.symbol) return null;
+  const symbol = intelligence.structuredContext.symbol;
 
   return {
     repositoryId,
-    provider: prompt.provider,
+    provider: intelligence.provider,
     symbol,
-    summary: prompt.content,
+    summary: intelligence.answer,
     impact: symbol.impact,
+    evidence: intelligence.evidence,
+    metadata: intelligence.metadata,
   };
 };

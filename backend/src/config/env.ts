@@ -33,6 +33,12 @@ const env = {
   AI_TIMEOUT_MS:
     Number(process.env.AI_TIMEOUT_MS) || 60000,
 
+  AI_CONTEXT_MAX_CHARS:
+    Number(process.env.AI_CONTEXT_MAX_CHARS) || 24000,
+
+  AI_EVIDENCE_LIMIT:
+    Number(process.env.AI_EVIDENCE_LIMIT) || 12,
+
   OPENAI_API_KEY:
     process.env.OPENAI_API_KEY || "",
 

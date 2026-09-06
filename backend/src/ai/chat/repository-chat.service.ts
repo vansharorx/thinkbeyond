@@ -1,39 +1,41 @@
-import { loadRepositoryExplorerState } from "../../services/repository-explorer-state.service";
-import { buildAiContext } from "../context/context-builder.service";
-import { retrieveRepositoryContext } from "../rag/retrieval.service";
-import { runAiTask } from "./ai-runner.service";
+import { AppError } from "../../utils/AppError";
+import type { AiRetrievalResult } from "../ai.types";
+import { runRepositoryIntelligence } from "../intelligence/intelligence-orchestrator.service";
+import type { EvidenceItem, IntelligenceMetadata } from "../intelligence/intelligence.types";
 
 export interface RepositoryChatResponse {
   repositoryId: string;
   question: string;
   provider: string;
   answer: string;
-  context: Awaited<ReturnType<typeof buildAiContext>>;
-  retrieval: ReturnType<typeof retrieveRepositoryContext>;
+  context: unknown;
+  retrieval: AiRetrievalResult;
+  evidence: EvidenceItem[];
+  metadata: IntelligenceMetadata;
 }
 
 export const chatRepository = async (
   repositoryId: string,
   question: string
 ): Promise<RepositoryChatResponse | null> => {
-  const state = await loadRepositoryExplorerState(repositoryId);
-  if (!state) {
-    return null;
+  const intelligence = await runRepositoryIntelligence({
+    repositoryId,
+    task: question,
+    template: "explainRepository",
+  });
+  if (!intelligence) return null;
+  if (!intelligence.retrieval) {
+    throw new AppError("Repository retrieval is unavailable", 502);
   }
-
-  const context = await buildAiContext(state);
-  const retrieval = retrieveRepositoryContext(state, question);
-  const prompt = await runAiTask("explainRepository", {
-    repository: context.repository,
-    retrieval,
-  }, question);
 
   return {
     repositoryId,
     question,
-    provider: prompt.provider,
-    answer: prompt.content,
-    context,
-    retrieval,
+    provider: intelligence.provider,
+    answer: intelligence.answer,
+    context: intelligence.context,
+    retrieval: intelligence.retrieval,
+    evidence: intelligence.evidence,
+    metadata: intelligence.metadata,
   };
 };

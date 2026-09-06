@@ -1,6 +1,6 @@
-import { loadRepositoryExplorerState } from "../../services/repository-explorer-state.service";
 import { buildFileContext } from "../context/file-context.service";
-import { runAiTask } from "./ai-runner.service";
+import { runRepositoryIntelligence } from "../intelligence/intelligence-orchestrator.service";
+import type { EvidenceItem, IntelligenceMetadata } from "../intelligence/intelligence.types";
 
 export interface ExplainFileResponse {
   repositoryId: string;
@@ -13,35 +13,36 @@ export interface ExplainFileResponse {
   exports: unknown[];
   architectureRole: string;
   potentialImprovements: string[];
+  evidence: EvidenceItem[];
+  metadata: IntelligenceMetadata;
 }
 
 export const explainFile = async (
   repositoryId: string,
   filePath: string
 ): Promise<ExplainFileResponse | null> => {
-  const state = await loadRepositoryExplorerState(repositoryId);
-  if (!state) {
-    return null;
-  }
-
-  const file = buildFileContext(state, filePath);
-  if (!file) {
-    return null;
-  }
-
-  const prompt = await runAiTask("explainFile", file, filePath);
+  const intelligence = await runRepositoryIntelligence({
+    repositoryId,
+    task: `Explain file ${filePath}`,
+    template: "explainFile",
+    filePath,
+  });
+  if (!intelligence || !intelligence.structuredContext.file) return null;
+  const file = intelligence.structuredContext.file;
 
   return {
     repositoryId,
-    provider: prompt.provider,
+    provider: intelligence.provider,
     file,
-    summary: prompt.content,
+    summary: intelligence.answer,
     purpose: inferPurpose(file),
     dependencies: file.dependencies.flatMap(dependency => dependency.imports),
     imports: file.imports,
     exports: file.exports,
     architectureRole: inferArchitectureRole(file.path),
-    potentialImprovements: inferImprovements(file, prompt.content),
+    potentialImprovements: inferImprovements(file, intelligence.answer),
+    evidence: intelligence.evidence,
+    metadata: intelligence.metadata,
   };
 };
 
