@@ -10,8 +10,11 @@ export type IntelligenceIntent =
   | "architecture_review"
   | "documentation"
   | "dependency_question"
+  | "reverse_dependency_question"
+  | "call_flow_question"
   | "impact_question"
   | "dead_code_question"
+  | "metrics_question"
   | "general_code_question";
 
 export interface IntelligenceRequest {

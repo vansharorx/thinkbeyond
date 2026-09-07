@@ -33,6 +33,9 @@ ${stringify(context.repository)}
 Retrieved Context:
 ${stringify(context.retrieval)}
 
+STRUCTURAL EVIDENCE:
+Use dependency, reverse-dependency, call-graph, impact, dead-code, knowledge-graph, metrics, and architecture entries when they are present. Treat them as repository facts and do not infer unsupported relationships.
+
 Question:
 ${context.question ?? "Explain the repository."}
 `;

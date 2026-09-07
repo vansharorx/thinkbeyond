@@ -32,7 +32,7 @@ export const runRepositoryIntelligence = async (
 
   const intent = determineIntent({ ...request, task });
   const retrievalQuery = task || request.filePath || request.symbolName || intent;
-  const retrieval = retrieveRepositoryContext(state, retrievalQuery);
+  const retrieval = retrieveRepositoryContext(state, retrievalQuery, 8, intent);
   const rawEvidence = [
     ...(targetContext.file ? [evidenceFromContext("FILE", targetContext.file, {
       path: targetContext.file.path,

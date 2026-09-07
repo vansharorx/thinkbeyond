@@ -3,8 +3,8 @@ import type { EvidenceItem } from "./intelligence.types";
 
 export const evidenceFromChunk = (chunk: AiChunk): EvidenceItem => ({
   type: normalizeType(chunk.kind),
-  path: typeof chunk.metadata.path === "string" ? chunk.metadata.path : undefined,
-  symbol: chunk.kind === "symbol" ? chunk.title.replace(/^[^:]+:\s*/, "") : undefined,
+  path: getPath(chunk),
+  symbol: getSymbol(chunk),
   content: chunk.content,
   relationships: chunk.metadata,
   relevanceScore: chunk.score,
@@ -32,6 +32,33 @@ function normalizeType(kind: string): string {
     symbol: "SYMBOL",
     callGraph: "CALL_GRAPH",
     dependencyGraph: "DEPENDENCY",
+    reverseDependency: "REVERSE_DEPENDENCY",
+    circularDependency: "DEPENDENCY",
+    impact: "IMPACT",
+    deadCode: "DEAD_CODE",
+    knowledgeGraph: "KNOWLEDGE_GRAPH",
+    metrics: "METRICS",
+    architecture: "ARCHITECTURE",
   };
   return types[kind] ?? kind.toUpperCase();
+}
+
+function getPath(chunk: AiChunk): string | undefined {
+  for (const key of ["path", "file", "nodeId", "workspace"] as const) {
+    const value = chunk.metadata[key];
+    if (typeof value === "string") return value;
+  }
+
+  return undefined;
+}
+
+function getSymbol(chunk: AiChunk): string | undefined {
+  if (chunk.kind === "symbol") return chunk.title.replace(/^[^:]+:\s*/, "");
+
+  for (const key of ["symbol", "function", "caller", "relationship"] as const) {
+    const value = chunk.metadata[key];
+    if (typeof value === "string") return value;
+  }
+
+  return undefined;
 }
