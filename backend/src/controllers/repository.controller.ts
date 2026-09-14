@@ -9,6 +9,7 @@ import { getRepositoryFileDetails } from "../services/repository-file.service";
 import { getSymbolDetails } from "../services/symbol-explorer.service";
 import { searchRepositoryData } from "../services/repository-search.service";
 import { getRepositoryOverview as loadRepositoryOverview } from "../services/repository-overview.service";
+import { navigateRepositoryData } from "../services/repository-navigation.service";
 import { chatRepository } from "../ai/chat/repository-chat.service";
 import { explainFile } from "../ai/chat/explain-file.service";
 import { explainSymbol } from "../ai/chat/explain-symbol.service";
@@ -147,6 +148,23 @@ export const getRepositoryOverview = asyncHandler(
 
     return res.json(
       successResponse("Repository overview loaded successfully", overview)
+    );
+  }
+);
+
+export const navigateRepository = asyncHandler(
+  async (req: Request, res: Response) => {
+    const repositoryId = firstString(req.params.id);
+    const query = firstOptionalString(req.body?.query) ?? firstOptionalString(req.query.query) ?? "";
+
+    const navigation = await navigateRepositoryData(repositoryId, query);
+
+    if (!navigation) {
+      throw new AppError("Repository not found", 404);
+    }
+
+    return res.json(
+      successResponse("Repository navigation completed successfully", navigation)
     );
   }
 );

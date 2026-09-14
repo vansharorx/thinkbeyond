@@ -6,6 +6,7 @@ import {
   getRepositorySymbol,
   searchRepository,
   getRepositoryOverview,
+  navigateRepository,
   chatWithRepository,
   explainRepositoryFile,
   explainRepositorySymbol,
@@ -43,6 +44,11 @@ router.get(
 router.get(
   "/:id/overview",
   getRepositoryOverview
+);
+
+router.post(
+  "/:id/navigate",
+  navigateRepository
 );
 
 router.post(
