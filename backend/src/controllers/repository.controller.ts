@@ -10,6 +10,7 @@ import { getSymbolDetails } from "../services/symbol-explorer.service";
 import { searchRepositoryData } from "../services/repository-search.service";
 import { getRepositoryOverview as loadRepositoryOverview } from "../services/repository-overview.service";
 import { navigateRepositoryData } from "../services/repository-navigation.service";
+import { getRepositoryImpact } from "../services/repository-impact.service";
 import { chatRepository } from "../ai/chat/repository-chat.service";
 import { explainFile } from "../ai/chat/explain-file.service";
 import { explainSymbol } from "../ai/chat/explain-symbol.service";
@@ -165,6 +166,31 @@ export const navigateRepository = asyncHandler(
 
     return res.json(
       successResponse("Repository navigation completed successfully", navigation)
+    );
+  }
+);
+
+export const getRepositoryImpactAnalysis = asyncHandler(
+  async (req: Request, res: Response) => {
+    const repositoryId = firstString(req.params.id);
+    const filePath = firstOptionalString(req.body?.filePath);
+    const symbolName = firstOptionalString(req.body?.symbolName);
+
+    if (!filePath && !symbolName) {
+      throw new AppError("filePath or symbolName is required", 400);
+    }
+
+    const result = await getRepositoryImpact(repositoryId, { filePath, symbolName });
+    if (!result) {
+      const state = await loadRepositoryExplorerState(repositoryId);
+      if (!state) {
+        throw new AppError("Repository not found", 404);
+      }
+      throw new AppError(symbolName ? "Symbol not found" : "File not found", 404);
+    }
+
+    return res.json(
+      successResponse("Repository impact analysis completed successfully", result)
     );
   }
 );

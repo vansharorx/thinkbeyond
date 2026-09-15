@@ -7,6 +7,7 @@ import {
   searchRepository,
   getRepositoryOverview,
   navigateRepository,
+  getRepositoryImpactAnalysis,
   chatWithRepository,
   explainRepositoryFile,
   explainRepositorySymbol,
@@ -49,6 +50,11 @@ router.get(
 router.post(
   "/:id/navigate",
   navigateRepository
+);
+
+router.post(
+  "/:id/impact",
+  getRepositoryImpactAnalysis
 );
 
 router.post(

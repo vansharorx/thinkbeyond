@@ -2,6 +2,7 @@ import { AppError } from "../utils/AppError";
 import { analyzeImpact } from "../analysis/impact/impact-analysis.service";
 import { searchRepositoryExplorer } from "../analysis/search/search.service";
 import { loadRepositoryExplorerState } from "./repository-explorer-state.service";
+import { buildImpactResponse, findImpactTarget, resolveImpactTarget } from "./repository-impact.service";
 
 export type NavigationResultType = "file" | "symbol" | "relationship";
 
@@ -49,6 +50,28 @@ export const navigateRepositoryData = async (
     scope: "all",
     matchMode: "partial",
   });
+
+  if (intent === "impact_navigation") {
+    const impactInput = findImpactTarget(state, normalized);
+    const impactTarget = impactInput ? resolveImpactTarget(state, impactInput) : null;
+    if (impactTarget) {
+      const impact = buildImpactResponse(state, impactTarget);
+      for (const item of [...impact.directImpact, ...impact.indirectImpact]) {
+        if (!item.path && !item.symbol) continue;
+        addResult(results, {
+          type: "relationship",
+          workspace: findWorkspaceForPath(state, item.path),
+          path: item.path,
+          symbol: item.symbol,
+          source: impactTarget.symbol ?? impactTarget.path,
+          target: item.symbol ?? item.path,
+          kind: item.relationship ?? "impact",
+          score: item.distance === "direct" ? 0.94 : 0.82,
+          reason: item.reason,
+        });
+      }
+    }
+  }
 
   for (const hit of searchResults.files) {
     const fileResult = buildFileResult(hit, normalized, tokens);
@@ -304,6 +327,16 @@ function findSymbolFile(state: Awaited<ReturnType<typeof loadRepositoryExplorerS
       if (sourceFile.symbolTable.has(symbolName)) {
         return sourceFile.relativePath;
       }
+    }
+  }
+  return undefined;
+}
+
+function findWorkspaceForPath(state: Awaited<ReturnType<typeof loadRepositoryExplorerState>> extends infer T ? NonNullable<T> : never, filePath?: string): string | undefined {
+  if (!filePath) return undefined;
+  for (const workspace of state.workspaces) {
+    if (workspace.sourceFiles.some(sourceFile => normalize(sourceFile.relativePath) === normalize(filePath))) {
+      return workspace.name;
     }
   }
   return undefined;

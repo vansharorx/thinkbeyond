@@ -7,6 +7,7 @@ import { runAiTask } from "../chat/ai-runner.service";
 import { determineIntent } from "./intent.service";
 import { boundedPromptValue, selectEvidence } from "./context-budget.service";
 import { evidenceFromChunk, evidenceFromContext } from "./evidence.service";
+import { buildImpactResponse, findImpactTarget, resolveImpactTarget } from "../../services/repository-impact.service";
 import type { AiRetrievalResult } from "../ai.types";
 import type { IntelligenceRequest, IntelligenceResult } from "./intelligence.types";
 
@@ -33,6 +34,13 @@ export const runRepositoryIntelligence = async (
   const intent = determineIntent({ ...request, task });
   const retrievalQuery = task || request.filePath || request.symbolName || intent;
   const retrieval = retrieveRepositoryContext(state, retrievalQuery, 8, intent);
+  const impactTargetInput = intent === "impact_question"
+    ? (request.filePath || request.symbolName
+      ? { filePath: request.filePath, symbolName: request.symbolName }
+      : findImpactTarget(state, task))
+    : null;
+  const impactTarget = impactTargetInput ? resolveImpactTarget(state, impactTargetInput) : null;
+  const impact = impactTarget ? buildImpactResponse(state, impactTarget) : null;
   const rawEvidence = [
     ...(targetContext.file ? [evidenceFromContext("FILE", targetContext.file, {
       path: targetContext.file.path,
@@ -44,6 +52,21 @@ export const runRepositoryIntelligence = async (
       symbol: targetContext.symbol.name,
       origin: "symbol-context",
       relationships: { callers: targetContext.symbol.callers, callees: targetContext.symbol.callees },
+    })] : []),
+    ...(impact ? [evidenceFromContext("IMPACT", impact, {
+      path: impact.target.path,
+      symbol: impact.target.symbol,
+      origin: "impact-analysis",
+      score: 90,
+      relationships: {
+        risk: impact.risk,
+        directImpact: impact.directImpact,
+        indirectImpact: impact.indirectImpact,
+        callers: impact.callers,
+        callees: impact.callees,
+        dependents: impact.dependents,
+        dependencies: impact.dependencies,
+      },
     })] : []),
     ...retrieval.chunks.map(evidenceFromChunk),
   ].sort((left, right) => right.relevanceScore - left.relevanceScore);
@@ -96,7 +119,7 @@ function buildPromptContext(
   const boundedRetrieval = {
     query: retrieval.query,
     chunks: evidence
-      .filter(item => item.origin === "repository-rag")
+      .filter(item => item.origin === "repository-rag" || item.origin === "impact-analysis")
       .map(item => ({
         id: `${item.type}:${item.path ?? item.symbol ?? item.origin}`,
         kind: item.type,
