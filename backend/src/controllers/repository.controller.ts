@@ -10,6 +10,7 @@ import { getSymbolDetails } from "../services/symbol-explorer.service";
 import { searchRepositoryData } from "../services/repository-search.service";
 import { getRepositoryOverview as loadRepositoryOverview } from "../services/repository-overview.service";
 import { navigateRepositoryData } from "../services/repository-navigation.service";
+import { getRepositoryDependencyIntelligence } from "../services/repository-dependency.service";
 import { getRepositoryImpact } from "../services/repository-impact.service";
 import { chatRepository } from "../ai/chat/repository-chat.service";
 import { explainFile } from "../ai/chat/explain-file.service";
@@ -191,6 +192,42 @@ export const getRepositoryImpactAnalysis = asyncHandler(
 
     return res.json(
       successResponse("Repository impact analysis completed successfully", result)
+    );
+  }
+);
+
+export const getRepositoryDependencyAnalysis = asyncHandler(
+  async (req: Request, res: Response) => {
+    const repositoryId = firstString(req.params.id);
+    const body = req.body ?? {};
+    const filePath = firstOptionalString(body?.filePath);
+    const from = firstOptionalString(body?.from);
+    const to = firstOptionalString(body?.to);
+    const includeCycles = body?.includeCycles === true;
+    const operation = firstOptionalString(body?.operation) as "dependencies" | "dependents" | "chain" | "cycles" | "connectivity" | "overview" | undefined;
+
+    if (!filePath && !from && !to && !operation) {
+      throw new AppError("filePath, from/to, or operation is required", 400);
+    }
+
+    const target = await getRepositoryDependencyIntelligence(repositoryId, {
+      filePath,
+      from,
+      to,
+      includeCycles,
+      operation,
+    });
+
+    if (!target) {
+      const state = await loadRepositoryExplorerState(repositoryId);
+      if (!state) {
+        throw new AppError("Repository not found", 404);
+      }
+      throw new AppError("File not found", 404);
+    }
+
+    return res.json(
+      successResponse("Repository dependency intelligence completed successfully", target)
     );
   }
 );

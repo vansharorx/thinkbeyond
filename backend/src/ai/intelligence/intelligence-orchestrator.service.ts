@@ -8,6 +8,7 @@ import { determineIntent } from "./intent.service";
 import { boundedPromptValue, selectEvidence } from "./context-budget.service";
 import { evidenceFromChunk, evidenceFromContext } from "./evidence.service";
 import { buildImpactResponse, findImpactTarget, resolveImpactTarget } from "../../services/repository-impact.service";
+import { getRepositoryDependencyIntelligence } from "../../services/repository-dependency.service";
 import type { AiRetrievalResult } from "../ai.types";
 import type { IntelligenceRequest, IntelligenceResult } from "./intelligence.types";
 
@@ -41,6 +42,13 @@ export const runRepositoryIntelligence = async (
     : null;
   const impactTarget = impactTargetInput ? resolveImpactTarget(state, impactTargetInput) : null;
   const impact = impactTarget ? buildImpactResponse(state, impactTarget) : null;
+  const dependencyTarget = findDependencyEvidenceTarget(state, task, request.filePath);
+  const dependencyIntelligence = dependencyTarget
+    ? await getRepositoryDependencyIntelligence(request.repositoryId, {
+      filePath: dependencyTarget,
+      includeCycles: /cycle|circular/.test(task),
+    })
+    : null;
   const rawEvidence = [
     ...(targetContext.file ? [evidenceFromContext("FILE", targetContext.file, {
       path: targetContext.file.path,
@@ -66,6 +74,19 @@ export const runRepositoryIntelligence = async (
         callees: impact.callees,
         dependents: impact.dependents,
         dependencies: impact.dependencies,
+      },
+    })] : []),
+    ...(dependencyIntelligence ? [evidenceFromContext("DEPENDENCY", dependencyIntelligence, {
+      path: dependencyIntelligence.target.path,
+      origin: "dependency-intelligence",
+      score: 92,
+      relationships: {
+        dependencies: dependencyIntelligence.dependencies,
+        dependents: dependencyIntelligence.dependents,
+        chains: dependencyIntelligence.chains,
+        cycles: dependencyIntelligence.cycles,
+        connectivity: dependencyIntelligence.connectivity,
+        architecture: dependencyIntelligence.architecture,
       },
     })] : []),
     ...retrieval.chunks.map(evidenceFromChunk),
@@ -103,6 +124,32 @@ export const runRepositoryIntelligence = async (
     response,
   };
 };
+
+function findDependencyEvidenceTarget(
+  state: Awaited<ReturnType<typeof loadRepositoryExplorerState>> extends infer T ? NonNullable<T> : never,
+  task: string,
+  filePath?: string
+): string | null {
+  if (filePath) {
+    const file = state.workspaces.flatMap(workspace => workspace.sourceFiles).find(sourceFile => sourceFile.relativePath === filePath);
+    if (file) return file.relativePath;
+  }
+
+  const normalized = task.toLowerCase();
+  const candidates = state.workspaces.flatMap(workspace => workspace.sourceFiles.map(sourceFile => sourceFile.relativePath));
+  for (const candidate of candidates) {
+    if (normalized.includes(candidate.toLowerCase().replace(/\\/g, "/"))) {
+      return candidate;
+    }
+  }
+
+  const matches = state.workspaces
+    .flatMap(workspace => workspace.sourceFiles)
+    .filter(sourceFile => sourceFile.relativePath.toLowerCase().includes(normalized.replace(/[^a-z0-9/._-]+/g, " ").split(/\s+/).filter(Boolean).join(" ").toLowerCase().split(" ").find(Boolean) ?? ""))
+    .map(sourceFile => sourceFile.relativePath);
+
+  return matches[0] ?? null;
+}
 
 function buildPromptContext(
   request: IntelligenceRequest,

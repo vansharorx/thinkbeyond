@@ -3,6 +3,7 @@ import { analyzeImpact } from "../analysis/impact/impact-analysis.service";
 import { searchRepositoryExplorer } from "../analysis/search/search.service";
 import { loadRepositoryExplorerState } from "./repository-explorer-state.service";
 import { buildImpactResponse, findImpactTarget, resolveImpactTarget } from "./repository-impact.service";
+import { findDependencyChain } from "./repository-dependency.service";
 
 export type NavigationResultType = "file" | "symbol" | "relationship";
 
@@ -45,6 +46,11 @@ export const navigateRepositoryData = async (
   const intent = inferNavigationIntent(normalized);
   const tokens = extractTokens(normalized);
   const results = new Map<string, RepositoryNavigationResult>();
+
+  const dependencyNavigation = resolveDependencyNavigation(state, normalized);
+  for (const result of dependencyNavigation) {
+    addResult(results, result);
+  }
 
   const searchResults = searchRepositoryExplorer(state.workspaces, normalized, {
     scope: "all",
@@ -282,10 +288,132 @@ function addResult(results: Map<string, RepositoryNavigationResult>, result: Rep
 function inferNavigationIntent(query: string): string {
   const normalized = query.toLowerCase();
   if (/what calls|who calls|called by|callers|callee|trace/.test(normalized)) return "call_navigation";
-  if (/depend on|depends on|used by|reverse depend|which files depend/.test(normalized)) return "dependency_navigation";
+  if (/depend on|depends on|used by|reverse depend|which files depend|who depends on|circular dependency|cycle/.test(normalized)) return "dependency_navigation";
   if (/what breaks|affected|impact|change .*|risk/.test(normalized)) return "impact_navigation";
   if (/where is|find|show me|which files|what is/.test(normalized)) return "repository_navigation";
   return "repository_navigation";
+}
+
+function resolveDependencyNavigation(
+  state: Awaited<ReturnType<typeof loadRepositoryExplorerState>> extends infer T ? NonNullable<T> : never,
+  query: string
+): RepositoryNavigationResult[] {
+  const normalized = query.trim();
+  if (!normalized) return [];
+
+  const patterns = [
+    /who depends on\s+(.+?)(?:\?|$)/i,
+    /what does\s+(.+?)\s+depend on(?:\?|$)/i,
+    /show the dependency chain from\s+(.+?)\s+to\s+(.+?)(?:\?|$)/i,
+    /dependency chain between\s+(.+?)\s+and\s+(.+?)(?:\?|$)/i,
+    /are there circular dependencies(?:\?|$)/i,
+    /circular dependencies involving\s+(.+?)(?:\?|$)/i,
+  ];
+
+  const results: RepositoryNavigationResult[] = [];
+  const workspaces = state.workspaces;
+
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern);
+    if (!match) continue;
+
+    if (match[0].toLowerCase().includes("circular") || match[0].toLowerCase().includes("cycle")) {
+      for (const workspace of workspaces) {
+        for (const cycle of workspace.circularDependencies.cycles) {
+          results.push(buildRelationshipResult({
+            type: "circular_dependency",
+            source: cycle.cycle[0] ?? "",
+            target: cycle.cycle[cycle.cycle.length - 1] ?? cycle.cycle[0] ?? "",
+            workspace: workspace.name,
+            score: 0.9,
+            reason: `Circular dependency detected: ${cycle.cycle.join(" -> ")}`,
+          }));
+        }
+      }
+      return results;
+    }
+
+    const left = match[1]?.trim();
+    const right = match[2]?.trim();
+    const targetFile = left ? findFileByQuery(state, left) : undefined;
+
+    if (pattern.toString().includes("dependency chain") && targetFile && right) {
+      const toFile = findFileByQuery(state, right) ?? right;
+      const path = findDependencyChain(state, targetFile, toFile);
+      if (path.length > 0) {
+        const chainWorkspace = findWorkspaceForPath(state, targetFile) ?? "unknown";
+        results.push(buildRelationshipResult({
+          type: "dependency_chain",
+          source: targetFile,
+          target: toFile,
+          workspace: chainWorkspace,
+          score: 0.88,
+          reason: `Dependency chain: ${path.join(" -> ")}`,
+        }));
+      }
+      return results;
+    }
+
+    if (targetFile) {
+      const fileWorkspace = findWorkspaceForPath(state, targetFile);
+      const dependencies = workspaces.flatMap(workspace => workspace.dependencyGraph.nodes)
+        .filter(node => samePath(node.file, targetFile))
+        .flatMap(node => node.imports.map(dep => ({
+          source: node.file,
+          target: dep,
+          workspace: fileWorkspace ?? workspaces.find(item => item.dependencyGraph.nodes.some(depNode => samePath(depNode.file, node.file)))?.name ?? "unknown",
+          kind: "dependency",
+        })));
+      const dependents = workspaces.flatMap(workspace => workspace.reverseDependencyGraph.nodes)
+        .filter(node => samePath(node.file, targetFile))
+        .flatMap(node => node.usedBy.map(dep => ({
+          source: dep,
+          target: node.file,
+          workspace: fileWorkspace ?? workspaces.find(item => item.reverseDependencyGraph.nodes.some(reverseNode => samePath(reverseNode.file, node.file)))?.name ?? "unknown",
+          kind: "reverse_dependency",
+        })));
+
+      if (match[0].toLowerCase().includes("who depends on")) {
+        for (const item of dependents) {
+          results.push(buildRelationshipResult({
+            type: item.kind,
+            source: item.source,
+            target: item.target,
+            workspace: item.workspace,
+            score: 0.86,
+            reason: `${item.target} is used by ${item.source}.`,
+          }));
+        }
+        return results;
+      }
+
+      for (const item of dependencies) {
+        results.push(buildRelationshipResult({
+          type: item.kind,
+          source: item.source,
+          target: item.target,
+          workspace: item.workspace,
+          score: 0.84,
+          reason: `${item.source} depends on ${item.target}.`,
+        }));
+      }
+
+      return results;
+    }
+  }
+
+  return results;
+}
+
+function findFileByQuery(state: Awaited<ReturnType<typeof loadRepositoryExplorerState>> extends infer T ? NonNullable<T> : never, query: string): string | undefined {
+  const normalized = normalize(query);
+  const searchResults = searchRepositoryExplorer(state.workspaces, query, { scope: "files", matchMode: "partial" });
+  const matched = searchResults.files.find(item => normalize(item.path).includes(normalized) || normalize(item.name).includes(normalized));
+  return matched?.path ?? state.workspaces.flatMap(workspace => workspace.sourceFiles).find(file => normalize(file.relativePath).includes(normalized))?.relativePath;
+}
+
+function samePath(left: string, right: string): boolean {
+  return normalize(left) === normalize(right);
 }
 
 function matchesQueryNode(value: string, query: string, tokens: string[]): boolean {
