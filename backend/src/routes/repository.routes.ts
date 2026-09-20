@@ -9,6 +9,7 @@ import {
   navigateRepository,
   getRepositoryImpactAnalysis,
   getRepositoryDependencyAnalysis,
+  getRepositorySymbolAnalysis,
   chatWithRepository,
   explainRepositoryFile,
   explainRepositorySymbol,
@@ -61,6 +62,11 @@ router.post(
 router.post(
   "/:id/dependencies",
   getRepositoryDependencyAnalysis
+);
+
+router.post(
+  "/:id/symbols",
+  getRepositorySymbolAnalysis
 );
 
 router.post(

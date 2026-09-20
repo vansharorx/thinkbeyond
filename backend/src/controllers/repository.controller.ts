@@ -12,6 +12,12 @@ import { getRepositoryOverview as loadRepositoryOverview } from "../services/rep
 import { navigateRepositoryData } from "../services/repository-navigation.service";
 import { getRepositoryDependencyIntelligence } from "../services/repository-dependency.service";
 import { getRepositoryImpact } from "../services/repository-impact.service";
+import {
+  getRepositorySymbolIntelligence,
+  SYMBOL_OPERATIONS,
+  type SymbolKind,
+  type SymbolOperation,
+} from "../services/repository-symbol.service";
 import { chatRepository } from "../ai/chat/repository-chat.service";
 import { explainFile } from "../ai/chat/explain-file.service";
 import { explainSymbol } from "../ai/chat/explain-symbol.service";
@@ -228,6 +234,44 @@ export const getRepositoryDependencyAnalysis = asyncHandler(
 
     return res.json(
       successResponse("Repository dependency intelligence completed successfully", target)
+    );
+  }
+);
+
+export const getRepositorySymbolAnalysis = asyncHandler(
+  async (req: Request, res: Response) => {
+    const repositoryId = firstString(req.params.id);
+    const body = req.body ?? {};
+    const operationValue = firstOptionalString(body.operation);
+    const operation = operationValue
+      ? SYMBOL_OPERATIONS.includes(operationValue as SymbolOperation) ? operationValue as SymbolOperation : undefined
+      : body.query ? "search" as const : "overview" as const;
+    const symbolName = firstOptionalString(body.symbolName);
+    const query = firstOptionalString(body.query);
+    const filePath = firstOptionalString(body.filePath);
+    const workspace = firstOptionalString(body.workspace);
+    const kindValue = firstOptionalString(body.kind);
+    const validKinds: SymbolKind[] = ["function", "method", "class", "interface", "enum", "typeAlias", "variable"];
+
+    if (!operation) throw new AppError("Invalid symbol operation", 400);
+    if (operation === "search" && !query && !symbolName) throw new AppError("query is required for symbol search", 400);
+    if (operation !== "search" && !symbolName) throw new AppError("symbolName is required for symbol analysis", 400);
+    if (kindValue && !validKinds.includes(kindValue as SymbolKind)) throw new AppError("Invalid symbol kind", 400);
+
+    const result = await getRepositorySymbolIntelligence(repositoryId, {
+      operation,
+      symbolName,
+      query,
+      filePath,
+      workspace,
+      kind: kindValue as SymbolKind | undefined,
+    });
+
+    if (!result) throw new AppError("Repository not found", 404);
+    if (!result.symbol && !result.search && !result.ambiguous) throw new AppError("Symbol not found", 404);
+
+    return res.json(
+      successResponse("Repository symbol intelligence completed successfully", result)
     );
   }
 );

@@ -9,6 +9,7 @@ import { boundedPromptValue, selectEvidence } from "./context-budget.service";
 import { evidenceFromChunk, evidenceFromContext } from "./evidence.service";
 import { buildImpactResponse, findImpactTarget, resolveImpactTarget } from "../../services/repository-impact.service";
 import { getRepositoryDependencyIntelligence } from "../../services/repository-dependency.service";
+import { getRepositorySymbolIntelligence } from "../../services/repository-symbol.service";
 import type { AiRetrievalResult } from "../ai.types";
 import type { IntelligenceRequest, IntelligenceResult } from "./intelligence.types";
 
@@ -49,6 +50,14 @@ export const runRepositoryIntelligence = async (
       includeCycles: /cycle|circular/.test(task),
     })
     : null;
+  const symbolEvidenceName = request.symbolName ?? findSymbolEvidenceName(state, task);
+  const symbolIntelligence = symbolEvidenceName
+    ? await getRepositorySymbolIntelligence(request.repositoryId, {
+      symbolName: symbolEvidenceName,
+      filePath: request.filePath,
+      operation: /impact|affected|change|break/.test(task) ? "impact" : "overview",
+    })
+    : null;
   const rawEvidence = [
     ...(targetContext.file ? [evidenceFromContext("FILE", targetContext.file, {
       path: targetContext.file.path,
@@ -87,6 +96,20 @@ export const runRepositoryIntelligence = async (
         cycles: dependencyIntelligence.cycles,
         connectivity: dependencyIntelligence.connectivity,
         architecture: dependencyIntelligence.architecture,
+      },
+    })] : []),
+    ...(symbolIntelligence?.symbol ? [evidenceFromContext("SYMBOL", symbolIntelligence.symbol, {
+      path: symbolIntelligence.symbol.filePath,
+      symbol: symbolIntelligence.symbol.name,
+      origin: "symbol-intelligence",
+      score: 95,
+      relationships: {
+        callers: symbolIntelligence.symbol.callers,
+        callees: symbolIntelligence.symbol.callees,
+        dependencies: symbolIntelligence.symbol.dependencies,
+        dependents: symbolIntelligence.symbol.dependents,
+        relatedSymbols: symbolIntelligence.symbol.relatedSymbols,
+        impact: symbolIntelligence.symbol.impact,
       },
     })] : []),
     ...retrieval.chunks.map(evidenceFromChunk),
@@ -151,6 +174,17 @@ function findDependencyEvidenceTarget(
   return matches[0] ?? null;
 }
 
+function findSymbolEvidenceName(
+  state: Awaited<ReturnType<typeof loadRepositoryExplorerState>> extends infer T ? NonNullable<T> : never,
+  task: string
+): string | null {
+  const normalized = task.toLowerCase();
+  const symbols = state.workspaces.flatMap(workspace => workspace.sourceFiles.flatMap(file => [...file.symbolTable.values()]));
+  return symbols
+    .filter(symbol => normalized.includes(symbol.name.toLowerCase()))
+    .sort((left, right) => right.name.length - left.name.length)[0]?.name ?? null;
+}
+
 function buildPromptContext(
   request: IntelligenceRequest,
   targetContext: Awaited<ReturnType<typeof buildAiContext>>,
@@ -166,7 +200,7 @@ function buildPromptContext(
   const boundedRetrieval = {
     query: retrieval.query,
     chunks: evidence
-      .filter(item => item.origin === "repository-rag" || item.origin === "impact-analysis")
+      .filter(item => item.origin === "repository-rag" || item.origin === "impact-analysis" || item.origin === "dependency-intelligence" || item.origin === "symbol-intelligence")
       .map(item => ({
         id: `${item.type}:${item.path ?? item.symbol ?? item.origin}`,
         kind: item.type,

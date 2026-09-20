@@ -4,6 +4,7 @@ import { searchRepositoryExplorer } from "../analysis/search/search.service";
 import { loadRepositoryExplorerState } from "./repository-explorer-state.service";
 import { buildImpactResponse, findImpactTarget, resolveImpactTarget } from "./repository-impact.service";
 import { findDependencyChain } from "./repository-dependency.service";
+import { searchRepositorySymbols } from "./repository-symbol.service";
 
 export type NavigationResultType = "file" | "symbol" | "relationship";
 
@@ -46,6 +47,23 @@ export const navigateRepositoryData = async (
   const intent = inferNavigationIntent(normalized);
   const tokens = extractTokens(normalized);
   const results = new Map<string, RepositoryNavigationResult>();
+
+  const symbolQuery = extractSymbolNavigationQuery(normalized);
+  if (symbolQuery) {
+    for (const match of searchRepositorySymbols(state, { query: symbolQuery })) {
+      addResult(results, {
+        type: "symbol",
+        workspace: match.workspace,
+        path: match.filePath,
+        symbol: match.name,
+        kind: match.kind,
+        score: Math.min(0.99, match.score / 100),
+        reason: match.name.toLowerCase() === symbolQuery.toLowerCase()
+          ? "Exact symbol definition match."
+          : "Deterministic symbol search match.",
+      });
+    }
+  }
 
   const dependencyNavigation = resolveDependencyNavigation(state, normalized);
   for (const result of dependencyNavigation) {
@@ -432,6 +450,11 @@ function extractTokens(query: string): string[] {
     .filter(Boolean)
     .filter(token => token.length > 2)
     .slice(0, 6);
+}
+
+function extractSymbolNavigationQuery(query: string): string | undefined {
+  const match = query.match(/(?:find|locate|where is|who calls|what calls|explain|show)\s+([A-Za-z_$][\w$]*)\s*\??$/i);
+  return match?.[1];
 }
 
 function normalize(value: string): string {
