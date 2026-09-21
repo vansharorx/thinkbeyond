@@ -39,6 +39,7 @@ function normalizeType(kind: string): string {
     knowledgeGraph: "KNOWLEDGE_GRAPH",
     metrics: "METRICS",
     architecture: "ARCHITECTURE",
+    semanticGraph: "SEMANTIC_GRAPH",
   };
   return types[kind] ?? kind.toUpperCase();
 }

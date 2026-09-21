@@ -5,6 +5,7 @@ import { loadRepositoryExplorerState } from "./repository-explorer-state.service
 import { buildImpactResponse, findImpactTarget, resolveImpactTarget } from "./repository-impact.service";
 import { findDependencyChain } from "./repository-dependency.service";
 import { searchRepositorySymbols } from "./repository-symbol.service";
+import { buildGraph } from "./repository-semantic-graph.service";
 
 export type NavigationResultType = "file" | "symbol" | "relationship";
 
@@ -63,6 +64,10 @@ export const navigateRepositoryData = async (
           : "Deterministic symbol search match.",
       });
     }
+  }
+
+  if (/connected|related|around|connect|dependencies around/.test(normalized.toLowerCase())) {
+    addSemanticGraphResults(results, buildGraph(state), tokens);
   }
 
   const dependencyNavigation = resolveDependencyNavigation(state, normalized);
@@ -455,6 +460,33 @@ function extractTokens(query: string): string[] {
 function extractSymbolNavigationQuery(query: string): string | undefined {
   const match = query.match(/(?:find|locate|where is|who calls|what calls|explain|show)\s+([A-Za-z_$][\w$]*)\s*\??$/i);
   return match?.[1];
+}
+
+function addSemanticGraphResults(
+  results: Map<string, RepositoryNavigationResult>,
+  graph: ReturnType<typeof buildGraph>,
+  tokens: string[]
+): void {
+  const matchingNodes = graph.nodes.filter(node => tokens.some(token => normalize(node.label).includes(token)));
+  for (const node of matchingNodes.slice(0, 10)) {
+    const adjacentEdges = graph.edges.filter(edge => edge.source === node.id || edge.target === node.id).slice(0, 6);
+    for (const edge of adjacentEdges) {
+      const otherId = edge.source === node.id ? edge.target : edge.source;
+      const other = graph.nodes.find(candidate => candidate.id === otherId);
+      if (!other) continue;
+      addResult(results, {
+        type: "relationship",
+        workspace: node.workspace ?? other.workspace,
+        path: other.path,
+        symbol: other.symbol,
+        source: node.id,
+        target: other.id,
+        kind: edge.type,
+        score: 0.81,
+        reason: `${node.label} is connected to ${other.label} through ${edge.type}.`,
+      });
+    }
+  }
 }
 
 function normalize(value: string): string {

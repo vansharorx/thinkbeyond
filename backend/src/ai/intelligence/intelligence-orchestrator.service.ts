@@ -10,6 +10,7 @@ import { evidenceFromChunk, evidenceFromContext } from "./evidence.service";
 import { buildImpactResponse, findImpactTarget, resolveImpactTarget } from "../../services/repository-impact.service";
 import { getRepositoryDependencyIntelligence } from "../../services/repository-dependency.service";
 import { getRepositorySymbolIntelligence } from "../../services/repository-symbol.service";
+import { getRepositorySemanticGraph } from "../../services/repository-semantic-graph.service";
 import type { AiRetrievalResult } from "../ai.types";
 import type { IntelligenceRequest, IntelligenceResult } from "./intelligence.types";
 
@@ -56,6 +57,15 @@ export const runRepositoryIntelligence = async (
       symbolName: symbolEvidenceName,
       filePath: request.filePath,
       operation: /impact|affected|change|break/.test(task) ? "impact" : "overview",
+    })
+    : null;
+  const graphTargetFile = request.filePath ?? findGraphFileEvidenceTarget(state, task);
+  const semanticGraph = graphTargetFile || symbolEvidenceName
+    ? await getRepositorySemanticGraph(request.repositoryId, {
+      operation: "subgraph",
+      symbolName: request.symbolName ?? undefined,
+      filePath: graphTargetFile ?? undefined,
+      depth: 2,
     })
     : null;
   const rawEvidence = [
@@ -110,6 +120,21 @@ export const runRepositoryIntelligence = async (
         dependents: symbolIntelligence.symbol.dependents,
         relatedSymbols: symbolIntelligence.symbol.relatedSymbols,
         impact: symbolIntelligence.symbol.impact,
+      },
+    })] : []),
+    ...(semanticGraph?.nodes ? [evidenceFromContext("SEMANTIC_GRAPH", {
+      center: semanticGraph.node,
+      nodes: semanticGraph.nodes,
+      relationships: semanticGraph.relationships,
+    }, {
+      path: semanticGraph.node?.path,
+      symbol: semanticGraph.node?.symbol,
+      origin: "semantic-graph",
+      score: 94,
+      relationships: {
+        depth: semanticGraph.depth,
+        nodeCount: semanticGraph.nodes.length,
+        edgeCount: semanticGraph.relationships?.length ?? 0,
       },
     })] : []),
     ...retrieval.chunks.map(evidenceFromChunk),
@@ -185,6 +210,17 @@ function findSymbolEvidenceName(
     .sort((left, right) => right.name.length - left.name.length)[0]?.name ?? null;
 }
 
+function findGraphFileEvidenceTarget(
+  state: Awaited<ReturnType<typeof loadRepositoryExplorerState>> extends infer T ? NonNullable<T> : never,
+  task: string
+): string | null {
+  const normalized = task.toLowerCase();
+  return state.workspaces
+    .flatMap(workspace => workspace.sourceFiles)
+    .map(sourceFile => sourceFile.relativePath)
+    .find(filePath => normalized.includes(filePath.toLowerCase())) ?? null;
+}
+
 function buildPromptContext(
   request: IntelligenceRequest,
   targetContext: Awaited<ReturnType<typeof buildAiContext>>,
@@ -200,7 +236,7 @@ function buildPromptContext(
   const boundedRetrieval = {
     query: retrieval.query,
     chunks: evidence
-      .filter(item => item.origin === "repository-rag" || item.origin === "impact-analysis" || item.origin === "dependency-intelligence" || item.origin === "symbol-intelligence")
+      .filter(item => item.origin === "repository-rag" || item.origin === "impact-analysis" || item.origin === "dependency-intelligence" || item.origin === "symbol-intelligence" || item.origin === "semantic-graph")
       .map(item => ({
         id: `${item.type}:${item.path ?? item.symbol ?? item.origin}`,
         kind: item.type,

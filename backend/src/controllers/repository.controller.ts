@@ -18,6 +18,10 @@ import {
   type SymbolKind,
   type SymbolOperation,
 } from "../services/repository-symbol.service";
+import {
+  getRepositorySemanticGraph,
+  SEMANTIC_GRAPH_OPERATIONS,
+} from "../services/repository-semantic-graph.service";
 import { chatRepository } from "../ai/chat/repository-chat.service";
 import { explainFile } from "../ai/chat/explain-file.service";
 import { explainSymbol } from "../ai/chat/explain-symbol.service";
@@ -272,6 +276,47 @@ export const getRepositorySymbolAnalysis = asyncHandler(
 
     return res.json(
       successResponse("Repository symbol intelligence completed successfully", result)
+    );
+  }
+);
+
+export const getRepositorySemanticGraphAnalysis = asyncHandler(
+  async (req: Request, res: Response) => {
+    const repositoryId = firstString(req.params.id);
+    const body = req.body ?? {};
+    const operationValue = firstOptionalString(body.operation);
+    if (!operationValue || !SEMANTIC_GRAPH_OPERATIONS.includes(operationValue as typeof SEMANTIC_GRAPH_OPERATIONS[number])) {
+      throw new AppError("Invalid graph operation", 400);
+    }
+
+    const operation = operationValue as typeof SEMANTIC_GRAPH_OPERATIONS[number];
+    const requiresTarget = operation !== "overview" && operation !== "path";
+    if (requiresTarget && !body.nodeId && !body.symbolName && !body.filePath) {
+      throw new AppError("nodeId, symbolName, or filePath is required", 400);
+    }
+    if (operation === "path" && (!body.from || !body.to)) {
+      throw new AppError("from and to are required for graph paths", 400);
+    }
+
+    const depth = body.depth === undefined ? undefined : Number(body.depth);
+    if (body.depth !== undefined && !Number.isInteger(depth)) {
+      throw new AppError("depth must be an integer", 400);
+    }
+
+    const result = await getRepositorySemanticGraph(repositoryId, {
+      operation,
+      nodeId: firstOptionalString(body.nodeId),
+      symbolName: firstOptionalString(body.symbolName),
+      filePath: firstOptionalString(body.filePath),
+      from: firstOptionalString(body.from),
+      to: firstOptionalString(body.to),
+      depth,
+    });
+    if (!result) throw new AppError("Repository not found", 404);
+    if (requiresTarget && !result.node) throw new AppError("Graph target not found", 404);
+
+    return res.json(
+      successResponse("Repository semantic graph query completed successfully", result)
     );
   }
 );

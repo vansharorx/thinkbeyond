@@ -10,6 +10,7 @@ import {
   getRepositoryImpactAnalysis,
   getRepositoryDependencyAnalysis,
   getRepositorySymbolAnalysis,
+  getRepositorySemanticGraphAnalysis,
   chatWithRepository,
   explainRepositoryFile,
   explainRepositorySymbol,
@@ -67,6 +68,11 @@ router.post(
 router.post(
   "/:id/symbols",
   getRepositorySymbolAnalysis
+);
+
+router.post(
+  "/:id/graph",
+  getRepositorySemanticGraphAnalysis
 );
 
 router.post(
