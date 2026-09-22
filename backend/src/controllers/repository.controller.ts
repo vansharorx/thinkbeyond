@@ -22,6 +22,13 @@ import {
   getRepositorySemanticGraph,
   SEMANTIC_GRAPH_OPERATIONS,
 } from "../services/repository-semantic-graph.service";
+import {
+  executeRepositoryIntelligenceQuery,
+} from "../services/repository-intelligence-query.service";
+import {
+  REPOSITORY_QUERY_OPERATIONS,
+  type RepositoryQueryOperation,
+} from "../types/repository-intelligence-query.types";
 import { chatRepository } from "../ai/chat/repository-chat.service";
 import { explainFile } from "../ai/chat/explain-file.service";
 import { explainSymbol } from "../ai/chat/explain-symbol.service";
@@ -317,6 +324,41 @@ export const getRepositorySemanticGraphAnalysis = asyncHandler(
 
     return res.json(
       successResponse("Repository semantic graph query completed successfully", result)
+    );
+  }
+);
+
+export const getRepositoryIntelligenceQuery = asyncHandler(
+  async (req: Request, res: Response) => {
+    const repositoryId = firstString(req.params.id);
+    const body = req.body ?? {};
+    const operationValue = firstOptionalString(body.operation);
+    if (!operationValue || !REPOSITORY_QUERY_OPERATIONS.includes(operationValue as RepositoryQueryOperation)) {
+      throw new AppError("Invalid query operation", 400);
+    }
+
+    const limit = body.limit === undefined ? undefined : Number(body.limit);
+    const depth = body.depth === undefined ? undefined : Number(body.depth);
+    if (body.limit !== undefined && !Number.isInteger(limit)) throw new AppError("limit must be an integer", 400);
+    if (body.depth !== undefined && !Number.isInteger(depth)) throw new AppError("depth must be an integer", 400);
+
+    const result = await executeRepositoryIntelligenceQuery(repositoryId, {
+      operation: operationValue as RepositoryQueryOperation,
+      query: firstOptionalString(body.query),
+      nodeId: firstOptionalString(body.nodeId),
+      symbolName: firstOptionalString(body.symbolName),
+      filePath: firstOptionalString(body.filePath),
+      from: firstOptionalString(body.from),
+      to: firstOptionalString(body.to),
+      kind: firstOptionalString(body.kind) as SymbolKind | undefined,
+      workspace: firstOptionalString(body.workspace),
+      depth,
+      limit,
+    });
+    if (!result) throw new AppError("Repository not found", 404);
+
+    return res.json(
+      successResponse("Repository intelligence query completed successfully", result)
     );
   }
 );

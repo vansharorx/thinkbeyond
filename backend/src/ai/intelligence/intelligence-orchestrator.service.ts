@@ -11,6 +11,11 @@ import { buildImpactResponse, findImpactTarget, resolveImpactTarget } from "../.
 import { getRepositoryDependencyIntelligence } from "../../services/repository-dependency.service";
 import { getRepositorySymbolIntelligence } from "../../services/repository-symbol.service";
 import { getRepositorySemanticGraph } from "../../services/repository-semantic-graph.service";
+import {
+  classifyRepositoryQuery,
+  executeRepositoryIntelligenceQuery,
+} from "../../services/repository-intelligence-query.service";
+import type { RepositoryIntelligenceQuery } from "../../types/repository-intelligence-query.types";
 import type { AiRetrievalResult } from "../ai.types";
 import type { IntelligenceRequest, IntelligenceResult } from "./intelligence.types";
 
@@ -67,6 +72,20 @@ export const runRepositoryIntelligence = async (
       filePath: graphTargetFile ?? undefined,
       depth: 2,
     })
+    : null;
+  const structuredQuery = buildStructuredQueryRequest(
+    state,
+    task,
+    request.filePath,
+    request.symbolName,
+    symbolEvidenceName
+  );
+  const queryResult = structuredQuery
+    ? await executeRepositoryIntelligenceQuery(
+      request.repositoryId,
+      structuredQuery,
+      classifyRepositoryQuery(task)
+    )
     : null;
   const rawEvidence = [
     ...(targetContext.file ? [evidenceFromContext("FILE", targetContext.file, {
@@ -135,6 +154,24 @@ export const runRepositoryIntelligence = async (
         depth: semanticGraph.depth,
         nodeCount: semanticGraph.nodes.length,
         edgeCount: semanticGraph.relationships?.length ?? 0,
+      },
+    })] : []),
+    ...(queryResult ? [evidenceFromContext("QUERY_RESULT", {
+      operation: queryResult.operation,
+      target: queryResult.target,
+      results: queryResult.results,
+      relationships: queryResult.relationships,
+      metadata: queryResult.metadata,
+      details: queryResult.details,
+    }, {
+      path: queryResult.target?.filePath,
+      symbol: queryResult.target?.symbolName,
+      origin: "intelligence-query",
+      score: 93,
+      relationships: {
+        operation: queryResult.operation,
+        source: queryResult.metadata.source,
+        count: queryResult.metadata.count,
       },
     })] : []),
     ...retrieval.chunks.map(evidenceFromChunk),
@@ -221,6 +258,39 @@ function findGraphFileEvidenceTarget(
     .find(filePath => normalized.includes(filePath.toLowerCase())) ?? null;
 }
 
+function buildStructuredQueryRequest(
+  state: Awaited<ReturnType<typeof loadRepositoryExplorerState>> extends infer T ? NonNullable<T> : never,
+  task: string,
+  filePath?: string,
+  symbolName?: string,
+  detectedSymbolName?: string | null
+): RepositoryIntelligenceQuery | null {
+  const classification = classifyRepositoryQuery(task);
+  const targetSymbol = symbolName ?? detectedSymbolName ?? undefined;
+  const targetFile = filePath ?? findGraphFileEvidenceTarget(state, task) ?? undefined;
+  if (!classification.operation) return null;
+
+  switch (classification.operation) {
+    case "callers":
+    case "callees":
+    case "symbol":
+      return targetSymbol ? { operation: classification.operation, symbolName: targetSymbol, filePath } : null;
+    case "dependencies":
+    case "dependents":
+      return targetFile ? { operation: classification.operation, filePath: targetFile } : null;
+    case "impact":
+      return targetFile || targetSymbol ? { operation: "impact", filePath: targetFile, symbolName: targetSymbol } : null;
+    case "architecture":
+    case "metrics":
+    case "overview":
+      return { operation: classification.operation };
+    case "search":
+      return task.trim() ? { operation: "search", query: task } : null;
+    default:
+      return null;
+  }
+}
+
 function buildPromptContext(
   request: IntelligenceRequest,
   targetContext: Awaited<ReturnType<typeof buildAiContext>>,
@@ -236,7 +306,7 @@ function buildPromptContext(
   const boundedRetrieval = {
     query: retrieval.query,
     chunks: evidence
-      .filter(item => item.origin === "repository-rag" || item.origin === "impact-analysis" || item.origin === "dependency-intelligence" || item.origin === "symbol-intelligence" || item.origin === "semantic-graph")
+      .filter(item => item.origin === "repository-rag" || item.origin === "impact-analysis" || item.origin === "dependency-intelligence" || item.origin === "symbol-intelligence" || item.origin === "semantic-graph" || item.origin === "intelligence-query")
       .map(item => ({
         id: `${item.type}:${item.path ?? item.symbol ?? item.origin}`,
         kind: item.type,
