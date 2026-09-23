@@ -11,6 +11,7 @@ import {
   getRepositoryDependencyAnalysis,
   getRepositorySymbolAnalysis,
   getRepositorySemanticGraphAnalysis,
+  getRepositoryReasoning,
   getRepositoryIntelligenceQuery,
   chatWithRepository,
   explainRepositoryFile,
@@ -74,6 +75,11 @@ router.post(
 router.post(
   "/:id/graph",
   getRepositorySemanticGraphAnalysis
+);
+
+router.post(
+  "/:id/reason",
+  getRepositoryReasoning
 );
 
 router.post(

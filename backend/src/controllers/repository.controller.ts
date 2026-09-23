@@ -29,6 +29,13 @@ import {
   REPOSITORY_QUERY_OPERATIONS,
   type RepositoryQueryOperation,
 } from "../types/repository-intelligence-query.types";
+import {
+  executeRepositoryReasoning,
+} from "../services/repository-reasoning.service";
+import {
+  REASONING_OPERATIONS,
+  type ReasoningOperation,
+} from "../types/repository-reasoning.types";
 import { chatRepository } from "../ai/chat/repository-chat.service";
 import { explainFile } from "../ai/chat/explain-file.service";
 import { explainSymbol } from "../ai/chat/explain-symbol.service";
@@ -324,6 +331,37 @@ export const getRepositorySemanticGraphAnalysis = asyncHandler(
 
     return res.json(
       successResponse("Repository semantic graph query completed successfully", result)
+    );
+  }
+);
+
+export const getRepositoryReasoning = asyncHandler(
+  async (req: Request, res: Response) => {
+    const repositoryId = firstString(req.params.id);
+    const body = req.body ?? {};
+    const operationValue = firstOptionalString(body.operation);
+    if (!operationValue || !REASONING_OPERATIONS.includes(operationValue as ReasoningOperation)) {
+      throw new AppError("Invalid reasoning operation", 400);
+    }
+
+    const numberValue = (value: unknown): number | undefined => value === undefined ? undefined : Number(value);
+    const result = await executeRepositoryReasoning(repositoryId, {
+      operation: operationValue as ReasoningOperation,
+      query: firstOptionalString(body.query),
+      symbolName: firstOptionalString(body.symbolName),
+      filePath: firstOptionalString(body.filePath),
+      from: firstOptionalString(body.from),
+      to: firstOptionalString(body.to),
+      depth: numberValue(body.depth),
+      limit: numberValue(body.limit),
+      maxQueries: numberValue(body.maxQueries),
+      maxFindings: numberValue(body.maxFindings),
+      maxEvidenceItems: numberValue(body.maxEvidenceItems),
+    });
+    if (!result) throw new AppError("Repository not found", 404);
+
+    return res.json(
+      successResponse("Repository reasoning completed successfully", result)
     );
   }
 );

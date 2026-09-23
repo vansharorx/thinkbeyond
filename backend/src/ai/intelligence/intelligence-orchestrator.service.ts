@@ -16,6 +16,8 @@ import {
   executeRepositoryIntelligenceQuery,
 } from "../../services/repository-intelligence-query.service";
 import type { RepositoryIntelligenceQuery } from "../../types/repository-intelligence-query.types";
+import { executeRepositoryReasoning } from "../../services/repository-reasoning.service";
+import type { RepositoryReasoningRequest } from "../../types/repository-reasoning.types";
 import type { AiRetrievalResult } from "../ai.types";
 import type { IntelligenceRequest, IntelligenceResult } from "./intelligence.types";
 
@@ -56,7 +58,8 @@ export const runRepositoryIntelligence = async (
       includeCycles: /cycle|circular/.test(task),
     })
     : null;
-  const symbolEvidenceName = request.symbolName ?? findSymbolEvidenceName(state, task);
+  const graphTargetFile = request.filePath ?? findGraphFileEvidenceTarget(state, task);
+  const symbolEvidenceName = request.symbolName ?? (graphTargetFile ? null : findSymbolEvidenceName(state, task));
   const symbolIntelligence = symbolEvidenceName
     ? await getRepositorySymbolIntelligence(request.repositoryId, {
       symbolName: symbolEvidenceName,
@@ -64,7 +67,6 @@ export const runRepositoryIntelligence = async (
       operation: /impact|affected|change|break/.test(task) ? "impact" : "overview",
     })
     : null;
-  const graphTargetFile = request.filePath ?? findGraphFileEvidenceTarget(state, task);
   const semanticGraph = graphTargetFile || symbolEvidenceName
     ? await getRepositorySemanticGraph(request.repositoryId, {
       operation: "subgraph",
@@ -86,6 +88,10 @@ export const runRepositoryIntelligence = async (
       structuredQuery,
       classifyRepositoryQuery(task)
     )
+    : null;
+  const reasoningRequest = buildReasoningRequest(state, task, request.filePath, request.symbolName, symbolEvidenceName);
+  const reasoning = reasoningRequest
+    ? await executeRepositoryReasoning(request.repositoryId, reasoningRequest)
     : null;
   const rawEvidence = [
     ...(targetContext.file ? [evidenceFromContext("FILE", targetContext.file, {
@@ -172,6 +178,24 @@ export const runRepositoryIntelligence = async (
         operation: queryResult.operation,
         source: queryResult.metadata.source,
         count: queryResult.metadata.count,
+      },
+    })] : []),
+    ...(reasoning ? [evidenceFromContext("REPOSITORY_REASONING", {
+      operation: reasoning.operation,
+      summary: reasoning.summary,
+      findings: reasoning.findings,
+      relationships: reasoning.relationships,
+      sources: reasoning.sources,
+      metadata: reasoning.metadata,
+    }, {
+      path: reasoning.target.filePath,
+      symbol: reasoning.target.symbolName,
+      origin: "repository-reasoning",
+      score: 96,
+      relationships: {
+        operation: reasoning.operation,
+        findingCount: reasoning.metadata.findingCount,
+        sources: reasoning.sources,
       },
     })] : []),
     ...retrieval.chunks.map(evidenceFromChunk),
@@ -291,6 +315,34 @@ function buildStructuredQueryRequest(
   }
 }
 
+function buildReasoningRequest(
+  state: Awaited<ReturnType<typeof loadRepositoryExplorerState>> extends infer T ? NonNullable<T> : never,
+  task: string,
+  filePath?: string,
+  symbolName?: string,
+  detectedSymbolName?: string | null
+): RepositoryReasoningRequest | null {
+  const normalized = task.toLowerCase();
+  const targetSymbol = symbolName ?? detectedSymbolName ?? undefined;
+  const targetFile = filePath ?? findGraphFileEvidenceTarget(state, task) ?? undefined;
+
+  if (/architecture|architectural|repository structure/.test(normalized)) return { operation: "architecture-analysis", depth: 2 };
+  if (/overview|summarize|repository summary/.test(normalized)) return { operation: "repository-overview", depth: 2 };
+  if (/what happens if|what would break|change .*|impact|affected/.test(normalized) && (targetFile || targetSymbol)) {
+    return { operation: "change-analysis", filePath: targetFile, symbolName: targetSymbol, depth: 2 };
+  }
+  if (/why .*depend|dependencies around|what depends|who depends|dependency|connected|connection/.test(normalized) && targetFile) {
+    return { operation: "dependency-analysis", filePath: targetFile, depth: 2 };
+  }
+  if (/connected|connection|related|relationship/.test(normalized) && targetSymbol) {
+    return { operation: "relationship-analysis", symbolName: targetSymbol, filePath, depth: 2 };
+  }
+  if (/explain|describe/.test(normalized) && targetSymbol) {
+    return { operation: "explain", symbolName: targetSymbol, filePath, depth: 2 };
+  }
+  return null;
+}
+
 function buildPromptContext(
   request: IntelligenceRequest,
   targetContext: Awaited<ReturnType<typeof buildAiContext>>,
@@ -306,7 +358,7 @@ function buildPromptContext(
   const boundedRetrieval = {
     query: retrieval.query,
     chunks: evidence
-      .filter(item => item.origin === "repository-rag" || item.origin === "impact-analysis" || item.origin === "dependency-intelligence" || item.origin === "symbol-intelligence" || item.origin === "semantic-graph" || item.origin === "intelligence-query")
+      .filter(item => item.origin === "repository-rag" || item.origin === "impact-analysis" || item.origin === "dependency-intelligence" || item.origin === "symbol-intelligence" || item.origin === "semantic-graph" || item.origin === "intelligence-query" || item.origin === "repository-reasoning")
       .map(item => ({
         id: `${item.type}:${item.path ?? item.symbol ?? item.origin}`,
         kind: item.type,

@@ -40,6 +40,7 @@ function normalizeType(kind: string): string {
     metrics: "METRICS",
     architecture: "ARCHITECTURE",
     semanticGraph: "SEMANTIC_GRAPH",
+    repositoryReasoning: "REPOSITORY_REASONING",
   };
   return types[kind] ?? kind.toUpperCase();
 }
