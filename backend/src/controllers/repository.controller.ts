@@ -33,6 +33,9 @@ import {
   executeRepositoryReasoning,
 } from "../services/repository-reasoning.service";
 import {
+  buildRepositoryAnswer,
+} from "../services/repository-answer.service";
+import {
   REASONING_OPERATIONS,
   type ReasoningOperation,
 } from "../types/repository-reasoning.types";
@@ -397,6 +400,28 @@ export const getRepositoryIntelligenceQuery = asyncHandler(
 
     return res.json(
       successResponse("Repository intelligence query completed successfully", result)
+    );
+  }
+);
+
+export const getRepositoryAnswer = asyncHandler(
+  async (req: Request, res: Response) => {
+    const repositoryId = firstString(req.params.id);
+    const body = req.body ?? {};
+    const question = firstOptionalString(body.question) ?? "";
+    const operation = firstOptionalString(body.operation);
+
+    if (!question) throw new AppError("question is required", 400);
+    if (question.trim().length === 0) throw new AppError("question is required", 400);
+    if (question.length > 4000) throw new AppError("question is too long", 400);
+
+    const result = await buildRepositoryAnswer(repositoryId, {
+      question,
+      operation: operation as "answer" | "explain" | "impact" | "dependency-analysis" | "architecture-analysis" | "symbol-analysis" | "relationship-analysis" | "change-analysis" | "repository-overview" | undefined,
+    });
+
+    return res.json(
+      successResponse("Repository answer completed successfully", result)
     );
   }
 );

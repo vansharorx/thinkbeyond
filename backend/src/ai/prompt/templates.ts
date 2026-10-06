@@ -33,8 +33,14 @@ ${stringify(context.repository)}
 Retrieved Context:
 ${stringify(context.retrieval)}
 
-STRUCTURAL EVIDENCE:
-Use dependency, reverse-dependency, call-graph, impact, dead-code, knowledge-graph, metrics, and architecture entries when they are present. Treat them as repository facts and do not infer unsupported relationships.
+GROUNDING RULES:
+1. Use the supplied repository evidence as the factual source.
+2. Do not invent files, symbols, dependencies, callers, architecture, or metrics.
+3. Do not claim something exists unless it is supported by evidence.
+4. Distinguish repository facts from interpretation.
+5. If evidence is insufficient or ambiguous, clearly say so.
+6. Preserve uncertainty and conflict instead of resolving them silently.
+7. Do not fabricate code snippets or line numbers.
 
 Question:
 ${context.question ?? "Explain the repository."}
