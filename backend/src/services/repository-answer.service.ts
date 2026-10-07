@@ -7,9 +7,11 @@ import { selectEvidence } from "../ai/intelligence/context-budget.service";
 import { evidenceFromContext } from "../ai/intelligence/evidence.service";
 import { executeRepositoryReasoning } from "./repository-reasoning.service";
 import { executeRepositoryIntelligenceQuery, classifyRepositoryQuery } from "./repository-intelligence-query.service";
+import { executeRepositoryInvestigation } from "./repository-investigation.service";
 import type { RepositoryAnswerRequest, RepositoryAnswerResult, GroundedEvidencePacket, GroundedEvidenceRecord, GroundedClaim } from "../types/repository-answer.types";
 import type { RepositoryReasoningResult } from "../types/repository-reasoning.types";
 import type { RepositoryIntelligenceResult } from "../types/repository-intelligence-query.types";
+import type { RepositoryInvestigationResult } from "../types/repository-investigation.types";
 
 const DEFAULT_ANSWER_MODE = "answer";
 const VALID_OPERATIONS = new Set([
@@ -49,8 +51,11 @@ export const buildRepositoryAnswer = async (
   const queryResult = query
     ? await executeRepositoryIntelligenceQuery(repositoryId, query, classifyRepositoryQuery(question)).catch(() => null)
     : null;
+  const investigation = shouldInvestigate(question)
+    ? await executeRepositoryInvestigation(repositoryId, { query: question }).catch(() => null)
+    : null;
 
-  const packet = buildGroundedEvidencePacket(question, reasoningOperation ?? operation, reasoning, queryResult);
+  const packet = buildGroundedEvidencePacket(question, reasoningOperation ?? operation, reasoning, queryResult, investigation);
   const grounding = assessGrounding(packet);
   if (!grounding.evidenceSufficient || grounding.ambiguous) {
     const note = grounding.ambiguous
@@ -211,6 +216,10 @@ function buildQueryFromQuestion(question: string, operation: string | null): Par
   return { operation: "overview", query: normalized, limit: 10 };
 }
 
+function shouldInvestigate(question: string): boolean {
+  return /what happens if|what could break|risky|risk|what should i inspect|how does .* work|authentication|connected|architecture concern|biggest architecture|dependents|what depends|callers|callees|impact/.test(question.toLowerCase());
+}
+
 function offlineAnswerResult(
   question: string,
   operation: string,
@@ -286,12 +295,42 @@ function buildGroundedEvidencePacket(
   question: string,
   operation: string,
   reasoning: RepositoryReasoningResult | null,
-  queryResult: RepositoryIntelligenceResult | null
+  queryResult: RepositoryIntelligenceResult | null,
+  investigation: RepositoryInvestigationResult | null
 ): GroundedEvidencePacket {
   const findings = reasoning?.findings ?? [];
   const evidence: GroundedEvidenceRecord[] = [];
   const relationships = reasoning?.relationships ?? [];
   const sources = reasoning?.sources ?? [];
+  const packetFindings: GroundedEvidencePacket["findings"] = [
+    ...findings.map(item => ({
+      id: item.id,
+      type: item.type,
+      title: item.title,
+      description: item.description,
+      sources: item.sources,
+    })),
+    ...(investigation?.findings.map(item => ({
+      id: item.id,
+      type: item.type,
+      title: item.title,
+      description: item.summary,
+      sources: item.sources,
+    })) ?? []),
+  ];
+
+  if (investigation) {
+    evidence.push({
+      id: `investigation:${investigation.query}`,
+      kind: "INVESTIGATION",
+      operation: investigation.intent,
+      source: "repository-investigation",
+      summary: `${investigation.stats.stepsExecuted} investigation step(s) produced ${investigation.findings.length} finding(s).`,
+      content: JSON.stringify(investigation, null, 2),
+      priority: 100,
+      provenance: ["repository-investigation", investigation.intent],
+    });
+  }
 
   if (reasoning) {
     for (const item of reasoning.evidence) {
@@ -332,13 +371,7 @@ function buildGroundedEvidencePacket(
     question,
     operation,
     target: reasoning?.target ?? { symbolName: undefined, filePath: undefined, from: undefined, to: undefined },
-    findings: findings.map(item => ({
-      id: item.id,
-      type: item.type,
-      title: item.title,
-      description: item.description,
-      sources: item.sources,
-    })),
+    findings: packetFindings,
     evidence: evidence,
     relationships: relationships,
     sources: Array.from(new Set([...sources, ...evidence.map(item => item.source)])),

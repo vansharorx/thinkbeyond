@@ -13,6 +13,7 @@ import {
   getRepositorySemanticGraphAnalysis,
   getRepositoryReasoning,
   getRepositoryIntelligenceQuery,
+  investigateRepository,
   getRepositoryAnswer,
   chatWithRepository,
   explainRepositoryFile,
@@ -86,6 +87,11 @@ router.post(
 router.post(
   "/:id/query",
   getRepositoryIntelligenceQuery
+);
+
+router.post(
+  "/:id/investigate",
+  investigateRepository
 );
 
 router.post(

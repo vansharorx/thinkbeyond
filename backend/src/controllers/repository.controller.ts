@@ -36,6 +36,13 @@ import {
   buildRepositoryAnswer,
 } from "../services/repository-answer.service";
 import {
+  executeRepositoryInvestigation,
+} from "../services/repository-investigation.service";
+import {
+  INVESTIGATION_OPERATIONS,
+  type InvestigationOperation,
+} from "../types/repository-investigation.types";
+import {
   REASONING_OPERATIONS,
   type ReasoningOperation,
 } from "../types/repository-reasoning.types";
@@ -400,6 +407,34 @@ export const getRepositoryIntelligenceQuery = asyncHandler(
 
     return res.json(
       successResponse("Repository intelligence query completed successfully", result)
+    );
+  }
+);
+
+export const investigateRepository = asyncHandler(
+  async (req: Request, res: Response) => {
+    const repositoryId = firstString(req.params.id);
+    const body = req.body ?? {};
+    const query = firstOptionalString(body.query) ?? "";
+    const operationValue = firstOptionalString(body.operation);
+    const numberValue = (value: unknown): number | undefined => value === undefined ? undefined : Number(value);
+
+    if (!query.trim()) throw new AppError("query is required", 400);
+    if (operationValue && !INVESTIGATION_OPERATIONS.includes(operationValue as InvestigationOperation)) {
+      throw new AppError("Invalid investigation operation", 400);
+    }
+
+    const result = await executeRepositoryInvestigation(repositoryId, {
+      query,
+      operation: operationValue as InvestigationOperation | undefined,
+      maxSteps: numberValue(body.maxSteps),
+      maxResultsPerStep: numberValue(body.maxResultsPerStep),
+      maxDepth: numberValue(body.maxDepth),
+    });
+    if (!result) throw new AppError("Repository not found", 404);
+
+    return res.json(
+      successResponse("Repository investigation completed successfully", result)
     );
   }
 );
