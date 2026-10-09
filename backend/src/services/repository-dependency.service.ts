@@ -72,6 +72,10 @@ export const getRepositoryDependencyIntelligence = async (
     return null;
   }
 
+  if (!input.filePath && !input.from && !input.to && (input.operation === "overview" || input.operation === "connectivity" || input.operation === "cycles")) {
+    return buildRepositoryWideDependencySummary(state, input);
+  }
+
   const target = resolveDependencyTarget(state, input);
   if (!target) {
     return null;
@@ -315,6 +319,78 @@ function getOutgoingDependencies(
 
   const node = workspace.dependencyGraph.nodes.find(item => samePath(item.file, filePath));
   return node?.imports ?? [];
+}
+
+function buildRepositoryWideDependencySummary(
+  state: RepositoryExplorerState,
+  input: DependencyRequest
+): RepositoryDependencyResult {
+  const dependencies = dedupeRelationshipList(
+    state.workspaces.flatMap(workspace =>
+      workspace.dependencyGraph.nodes.flatMap(node =>
+        (node.imports ?? []).map(target => ({
+          source: node.file,
+          target,
+          workspace: workspace.name,
+          relationship: "depends_on" as const,
+        }))
+      )
+    )
+  );
+
+  const dependents = dedupeRelationshipList(
+    state.workspaces.flatMap(workspace =>
+      workspace.reverseDependencyGraph.nodes.flatMap(node =>
+        (node.usedBy ?? []).map(source => ({
+          source,
+          target: node.file,
+          workspace: workspace.name,
+          relationship: "used_by" as const,
+        }))
+      )
+    )
+  );
+
+  const cycles = input.includeCycles || input.operation === "cycles"
+    ? state.workspaces.flatMap(workspace =>
+        (workspace.circularDependencies?.cycles ?? []).map(cycle => ({
+          workspace: workspace.name,
+          cycle: cycle.cycle,
+          length: cycle.cycle.length,
+        }))
+      )
+    : [];
+
+  const connectivity: DependencyConnectivity = {
+    dependencyCount: dependencies.length,
+    dependentCount: dependents.length,
+    totalConnections: dependencies.length + dependents.length,
+    couplingHint:
+      dependencies.length + dependents.length === 0
+        ? "The repository has no direct dependency or dependent edges in the indexed graph."
+        : dependencies.length + dependents.length <= 20
+          ? "The repository is lightly connected and likely manageable with focused review."
+          : dependencies.length + dependents.length <= 80
+            ? "The repository shows moderate cross-module coupling and may need architectural review."
+            : "The repository is heavily coupled; architectural review is warranted.",
+  };
+
+  return {
+    target: {
+      workspace: "repository",
+      path: ".",
+    },
+    dependencies,
+    dependents,
+    chains: [],
+    cycles,
+    connectivity,
+    architecture: state.workspaces.map(item => ({
+      workspace: item.name,
+      architecture: item.architecture.architecture,
+      patterns: item.architecture.patterns,
+    })),
+  };
 }
 
 function dedupeRelationshipList(
