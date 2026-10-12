@@ -8,9 +8,11 @@ import { analyzeWorkspaces } from "./workspace.service";
 import { generateRepositorySummary } from "./repository-summary.service";
 import { buildRepositoryKnowledge } from "./repository-knowledge.service";
 import { saveRepositoryExplorerState } from "./repository-explorer-state.service";
+import { createRepository } from "../repositories/repository.repository";
 
 export const importRepositoryService = async (
-  url: string
+  url: string,
+  ownerId: string
 ) => {
 
   const repository =
@@ -55,6 +57,8 @@ export const importRepositoryService = async (
     knowledge: knowledgeSnapshot,
     workspaces,
   });
+
+  await createRepository(repository.repositoryId, ownerId);
 
   return {
     repositoryId: repository.repositoryId,

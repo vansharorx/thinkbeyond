@@ -51,13 +51,18 @@ import { explainFile } from "../ai/chat/explain-file.service";
 import { explainSymbol } from "../ai/chat/explain-symbol.service";
 import { reviewArchitecture } from "../ai/chat/architecture-review.service";
 import { generateDocumentation } from "../ai/chat/documentation.service";
+import { AuthRequest } from "../middlewares/auth.middleware";
 
 export const importRepository = asyncHandler(
-  async (req: Request, res: Response) => {
+  async (req: AuthRequest, res: Response) => {
     const { url } = req.body;
 
+    if (!req.user) {
+      throw new AppError("Authorization token is missing", 401);
+    }
+
     const repository =
-      await importRepositoryService(url);
+      await importRepositoryService(url, req.user.userId);
 
     return res.status(201).json(
       successResponse(

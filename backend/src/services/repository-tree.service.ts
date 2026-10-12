@@ -24,7 +24,7 @@ export const buildRepositoryTree = async (
     options: RepositoryTreeOptions = {}
 ): Promise<RepositoryNode[]> => {
 
-    const rootPath = resolveTargetPath(
+    const rootPath = await resolveTargetPath(
         repositoryPath,
         options.relativePath
     );
@@ -54,7 +54,7 @@ async function walk(
 
     for (const entry of entries) {
 
-        if (IGNORE.includes(entry.name)) {
+        if (IGNORE.includes(entry.name) || entry.isSymbolicLink()) {
             continue;
         }
 
@@ -107,25 +107,45 @@ async function buildFileNode(
 
 }
 
-function resolveTargetPath(
+async function resolveTargetPath(
     repositoryPath: string,
     relativePath?: string
-): string {
+): Promise<string> {
+    const normalizedRoot = path.resolve(repositoryPath);
+
+    let canonicalRoot: string;
+    try {
+        canonicalRoot = await fs.realpath(normalizedRoot);
+    } catch {
+        return normalizedRoot;
+    }
 
     if (!relativePath) {
-        return repositoryPath;
+        return canonicalRoot;
     }
 
     const candidate = path.resolve(repositoryPath, relativePath);
-    const normalizedRoot = path.resolve(repositoryPath);
 
     if (
         candidate !== normalizedRoot &&
         !candidate.startsWith(`${normalizedRoot}${path.sep}`)
     ) {
-        return repositoryPath;
+        return canonicalRoot;
     }
 
-    return candidate;
+    try {
+        const canonicalCandidate = await fs.realpath(candidate);
+
+        if (
+            canonicalCandidate !== canonicalRoot &&
+            !canonicalCandidate.startsWith(`${canonicalRoot}${path.sep}`)
+        ) {
+            return canonicalRoot;
+        }
+    } catch {
+        return canonicalRoot;
+    }
+
+    return await fs.realpath(candidate);
 
 }

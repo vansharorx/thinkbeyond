@@ -40,7 +40,66 @@ interface SerializedRepositoryExplorerState {
 }
 
 export const getRepositoryRootPath = (repositoryId: string): string =>
-  path.join(process.cwd(), "temp", "repositories", repositoryId);
+  resolveRepositoryStoragePath(repositoryId);
+
+export const validateRepositoryId = (repositoryId: string): string => {
+  if (!repositoryId || typeof repositoryId !== "string") {
+    throw new Error("Repository ID is required");
+  }
+
+  if (!/^[A-Za-z0-9-]+$/.test(repositoryId)) {
+    throw new Error("Repository ID contains invalid characters");
+  }
+
+  return repositoryId;
+};
+
+const resolveRepositoryStoragePath = (repositoryId: string): string => {
+  const safeRepositoryId = validateRepositoryId(repositoryId);
+  const root = path.resolve(process.cwd(), "temp", "repositories");
+  const resolved = path.resolve(root, safeRepositoryId);
+
+  if (resolved !== root && !resolved.startsWith(`${root}${path.sep}`)) {
+    throw new Error("Repository path is outside the repository root");
+  }
+
+  return resolved;
+};
+
+export const ensureRepositoryRootPath = async (
+  repositoryId: string,
+  create: boolean
+): Promise<string> => {
+  const repositoryRoot = getRepositoryRootPath(repositoryId);
+  const storageRoot = path.resolve(process.cwd(), "temp", "repositories");
+
+  if (create) {
+    await fs.mkdir(storageRoot, { recursive: true });
+  }
+
+  const canonicalStorageRoot = await fs.realpath(storageRoot);
+  const canonicalApplicationRoot = await fs.realpath(process.cwd());
+  if (
+    canonicalStorageRoot !== canonicalApplicationRoot &&
+    !canonicalStorageRoot.startsWith(`${canonicalApplicationRoot}${path.sep}`)
+  ) {
+    throw new Error("Repository storage root is outside the application directory");
+  }
+
+  if (create) {
+    await fs.mkdir(repositoryRoot, { recursive: true });
+  }
+
+  const canonicalRepositoryRoot = await fs.realpath(repositoryRoot);
+  if (
+    canonicalRepositoryRoot !== canonicalStorageRoot &&
+    !canonicalRepositoryRoot.startsWith(`${canonicalStorageRoot}${path.sep}`)
+  ) {
+    throw new Error("Repository path is outside the repository storage root");
+  }
+
+  return canonicalRepositoryRoot;
+};
 
 export const getRepositorySnapshotPath = (repositoryId: string): string =>
   path.join(getRepositoryRootPath(repositoryId), "analysis.json");
@@ -56,9 +115,7 @@ export const saveRepositoryExplorerState = async (
     workspaces: state.workspaces.map(serializeWorkspaceAnalysis),
   };
 
-  await fs.mkdir(getRepositoryRootPath(state.repositoryId), {
-    recursive: true,
-  });
+  await ensureRepositoryRootPath(state.repositoryId, true);
 
   await fs.writeFile(
     getRepositorySnapshotPath(state.repositoryId),
@@ -71,16 +128,23 @@ export const loadRepositoryExplorerState = async (
   repositoryId: string
 ): Promise<RepositoryExplorerState | null> => {
   try {
+    const safeRepositoryId = validateRepositoryId(repositoryId);
+    const canonicalRepositoryRoot = await ensureRepositoryRootPath(safeRepositoryId, false);
     const raw = await fs.readFile(
-      getRepositorySnapshotPath(repositoryId),
+      getRepositorySnapshotPath(safeRepositoryId),
       "utf-8"
     );
 
     const parsed = JSON.parse(raw) as SerializedRepositoryExplorerState;
 
+    if (parsed.repositoryId !== safeRepositoryId) {
+      return null;
+    }
+
     return {
-      repositoryId: parsed.repositoryId,
-      repositoryPath: parsed.repositoryPath,
+      repositoryId: safeRepositoryId,
+      // The snapshot is data, not an authority for filesystem locations.
+      repositoryPath: canonicalRepositoryRoot,
       summary: parsed.summary,
       knowledge: parsed.knowledge,
       workspaces: parsed.workspaces.map(deserializeWorkspaceAnalysis),

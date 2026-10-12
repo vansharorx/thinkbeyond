@@ -8,6 +8,15 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ) => {
+  const statusCode = (err as Error & { status?: number }).status;
+
+  if (statusCode === 400 || statusCode === 413) {
+    return res.status(statusCode).json({
+      success: false,
+      message: statusCode === 413 ? "Request body is too large" : "Malformed request body",
+    });
+  }
+
   if (err instanceof AppError) {
     return res.status(err.statusCode).json({
       success: err.success,

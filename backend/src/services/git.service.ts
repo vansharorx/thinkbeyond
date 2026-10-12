@@ -1,7 +1,6 @@
 import simpleGit from "simple-git";
-import path from "path";
-import fs from "fs/promises";
 import { v4 as uuid } from "uuid";
+import { ensureRepositoryRootPath } from "./repository-explorer-state.service";
 
 const git = simpleGit();
 
@@ -11,16 +10,7 @@ export const cloneRepository = async (
 
   const repositoryId = uuid();
 
-  const tempDirectory = path.join(
-    process.cwd(),
-    "temp",
-    "repositories",
-    repositoryId
-  );
-
-  await fs.mkdir(tempDirectory, {
-    recursive: true,
-  });
+  const tempDirectory = await ensureRepositoryRootPath(repositoryId, true);
 
   await git.clone(
     repositoryUrl,

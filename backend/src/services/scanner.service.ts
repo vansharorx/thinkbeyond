@@ -52,6 +52,10 @@ export const scanRepository = async (
 
     for (const entry of entries) {
 
+      if (entry.isSymbolicLink()) {
+        continue;
+      }
+
       if (
         entry.isDirectory() &&
         IGNORED_DIRECTORIES.has(entry.name)

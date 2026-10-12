@@ -59,6 +59,10 @@ export const indexSourceFiles = async (
 
         for (const entry of entries) {
 
+            if (entry.isSymbolicLink()) {
+                continue;
+            }
+
             const fullPath = path.join(currentPath, entry.name);
 
             if (entry.isDirectory()) {

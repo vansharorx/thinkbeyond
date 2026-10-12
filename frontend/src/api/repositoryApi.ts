@@ -12,11 +12,23 @@ import type {
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:5000/api/v1';
 const REPOSITORY_BASE = `${API_BASE}/repositories`;
 
+export interface LoginResponse {
+  user: { userId: string; email: string };
+  accessToken: string;
+  refreshToken: string;
+}
+
+function getAuthHeaders(): Record<string, string> {
+  const token = localStorage.getItem('accessToken');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${REPOSITORY_BASE}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
+      ...getAuthHeaders(),
       ...(init.headers ?? {}),
     },
   });
@@ -25,11 +37,32 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const payload = text ? (JSON.parse(text) as ApiEnvelope<T>) : ({} as ApiEnvelope<T>);
 
   if (!response.ok || payload.success === false) {
+    if (response.status === 401) {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+    }
     throw new Error(payload.message ?? `Request failed (${response.status})`);
   }
 
   return (payload.data ?? (payload as unknown as T)) as T;
 }
+
+export const authApi = {
+  login: async (email: string, password: string): Promise<LoginResponse> => {
+    const response = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const payload = await response.json() as ApiEnvelope<LoginResponse>;
+    if (!response.ok || payload.success === false || !payload.data) {
+      throw new Error(payload.message ?? `Request failed (${response.status})`);
+    }
+    localStorage.setItem('accessToken', payload.data.accessToken);
+    localStorage.setItem('refreshToken', payload.data.refreshToken);
+    return payload.data;
+  },
+};
 
 function jsonBody(value: Record<string, unknown>) {
   return JSON.stringify(value);

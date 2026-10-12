@@ -21,13 +21,18 @@ import {
   reviewRepositoryArchitecture,
   generateRepositoryDocumentation,
 } from "../controllers/repository.controller";
+import { authenticate } from "../middlewares/auth.middleware";
+import { authorizeRepository } from "../middlewares/repository-ownership.middleware";
 
 const router = Router();
 
 router.post(
   "/import",
+  authenticate,
   importRepository
 );
+
+router.use("/:id", authenticate, authorizeRepository);
 
 router.get(
   "/:id/tree",

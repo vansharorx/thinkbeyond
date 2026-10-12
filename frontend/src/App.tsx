@@ -1,6 +1,6 @@
 import { BrowserRouter, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { repositoryApi, getRepositoryIdFromPayload } from './api/repositoryApi';
+import { authApi, repositoryApi, getRepositoryIdFromPayload } from './api/repositoryApi';
 import './App.css';
 
 const DEFAULT_REPOSITORY_ID = '6418371f-9631-4f9f-aaa7-b6629735f49b';
@@ -9,7 +9,8 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to={`/repositories/${DEFAULT_REPOSITORY_ID}/overview`} replace />} />
+        <Route path="/" element={<Navigate to={localStorage.getItem('accessToken') ? `/repositories/${DEFAULT_REPOSITORY_ID}/overview` : '/login'} replace />} />
+        <Route path="/login" element={<LoginPage />} />
         <Route path="/repositories/:id/*" element={<RepositoryWorkspace />} />
       </Routes>
     </BrowserRouter>
@@ -26,6 +27,12 @@ function RepositoryWorkspace() {
   const [searchResults, setSearchResults] = useState<Array<Record<string, unknown>>>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!localStorage.getItem('accessToken')) {
+      navigate('/login', { replace: true });
+    }
+  }, [navigate]);
 
   useEffect(() => {
     let active = true;
@@ -187,6 +194,42 @@ function RepositoryWorkspace() {
         </Routes>
       </main>
     </div>
+  );
+}
+
+function LoginPage() {
+  const navigate = useNavigate();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      await authApi.login(email, password);
+      navigate(`/repositories/${DEFAULT_REPOSITORY_ID}/overview`, { replace: true });
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : 'Login failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <main className="content-panel auth-page">
+      <form className="auth-form" onSubmit={submit}>
+        <h1>Sign in to ThinkBeyond</h1>
+        <label htmlFor="email">Email</label>
+        <input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+        <label htmlFor="password">Password</label>
+        <input id="password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+        {error ? <p role="alert">{error}</p> : null}
+        <button type="submit" disabled={loading}>{loading ? 'Signing in...' : 'Sign in'}</button>
+      </form>
+    </main>
   );
 }
 
