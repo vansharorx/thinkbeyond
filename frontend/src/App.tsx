@@ -120,6 +120,17 @@ function RepositoryWorkspace() {
           <div className="context-pill">Repository: {repoLabel}</div>
           {selectedFile ? <div className="context-pill">File: {selectedFile}</div> : null}
           {selectedSymbol ? <div className="context-pill">Symbol: {selectedSymbol}</div> : null}
+          <button
+            type="button"
+            className="logout-button"
+            onClick={() => {
+              localStorage.removeItem('accessToken');
+              localStorage.removeItem('refreshToken');
+              navigate('/login', { replace: true });
+            }}
+          >
+            Sign out
+          </button>
         </div>
       </aside>
 
@@ -187,7 +198,7 @@ function RepositoryWorkspace() {
           <Route path="files" element={<FilesPage repositoryId={repositoryId} selectedFile={selectedFile} setSelectedFile={setSelectedFile} />} />
           <Route path="symbols" element={<SymbolsPage repositoryId={repositoryId} selectedSymbol={selectedSymbol} setSelectedSymbol={setSelectedSymbol} />} />
           <Route path="dependencies" element={<DependenciesPage repositoryId={repositoryId} />} />
-          <Route path="impact" element={<ImpactPage repositoryId={repositoryId} selectedFile={selectedFile} selectedSymbol={selectedSymbol} />} />
+          <Route path="impact" element={<ImpactPage key={`${selectedFile ?? ''}:${selectedSymbol ?? ''}`} repositoryId={repositoryId} selectedFile={selectedFile} selectedSymbol={selectedSymbol} />} />
           <Route path="graph" element={<GraphPage repositoryId={repositoryId} />} />
           <Route path="ai" element={<AiPage repositoryId={repositoryId} />} />
           <Route path="investigate" element={<InvestigationPage repositoryId={repositoryId} />} />
@@ -221,6 +232,7 @@ function LoginPage() {
   return (
     <main className="content-panel auth-page">
       <form className="auth-form" onSubmit={submit}>
+        <div className="auth-brand"><span className="brand-mark">TB</span><span>ThinkBeyond</span></div>
         <h1>Sign in to ThinkBeyond</h1>
         <label htmlFor="email">Email</label>
         <input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
@@ -473,7 +485,6 @@ function SymbolsPage({ repositoryId, selectedSymbol, setSelectedSymbol }: { repo
   useEffect(() => {
     const trimmed = query.trim();
     if (!trimmed) {
-      setResults([]);
       return;
     }
 
@@ -525,7 +536,7 @@ function SymbolsPage({ repositoryId, selectedSymbol, setSelectedSymbol }: { repo
         <input id="symbol-search" type="text" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="e.g. refreshToken, RepositoryOverview" />
         {loading ? <LoadingState label="Loading symbol matches…" /> : null}
         <ul className="entity-list">
-          {results.length > 0 ? results.slice(0, 15).map((item, index) => (
+          {(query.trim() ? results : []).length > 0 ? (query.trim() ? results : []).slice(0, 15).map((item, index) => (
             <li key={`${stringValue(item.name ?? item.symbol ?? 'symbol')}-${index}`}>
               <button type="button" className="entity-button" onClick={() => void handleSelect(stringValue(item.name ?? item.symbol ?? ''))}>
                 <span>{stringValue(item.name ?? item.symbol ?? 'Unknown symbol')}</span>
@@ -651,11 +662,6 @@ function ImpactPage({ repositoryId, selectedFile, selectedSymbol }: { repository
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    setQueryFile(selectedFile ?? '');
-    setQuerySymbol(selectedSymbol ?? '');
-  }, [selectedFile, selectedSymbol]);
-
   const runImpactCheck = async () => {
     const payload: Record<string, unknown> = {};
     if (queryFile.trim()) {
@@ -756,7 +762,7 @@ function GraphPage({ repositoryId }: { repositoryId: string }) {
     return () => {
       active = false;
     };
-  }, [repositoryId]);
+  }, [repositoryId, ROOT_NODE_ID]);
 
   const overview = asRecord(graph?.overview ?? {});
   const allNodes = asArray(graph?.nodes ?? []);
@@ -1034,17 +1040,10 @@ function GraphPage({ repositoryId }: { repositoryId: string }) {
 
 function AiPage({ repositoryId }: { repositoryId: string }) {
   const location = useLocation();
-  const [question, setQuestion] = useState('How does authentication work?');
+  const [question, setQuestion] = useState(() => new URLSearchParams(location.search).get('q') ?? 'How does authentication work?');
   const [answer, setAnswer] = useState<Record<string, unknown> | null>(null);
   const [investigation, setInvestigation] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    const queryFromRoute = new URLSearchParams(location.search).get('q');
-    if (queryFromRoute) {
-      setQuestion(queryFromRoute);
-    }
-  }, [location.search]);
 
   const askQuestion = async () => {
     if (!question.trim()) {
