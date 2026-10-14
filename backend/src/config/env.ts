@@ -41,6 +41,11 @@ const ensureConfiguration = (config: Record<string, string | number | undefined>
     throw new Error("AI_EVIDENCE_LIMIT must be between 1 and 100");
   }
 
+  const readinessTimeoutMs = Number(config.READINESS_TIMEOUT_MS);
+  if (!Number.isFinite(readinessTimeoutMs) || readinessTimeoutMs < 100 || readinessTimeoutMs > 10000) {
+    throw new Error("READINESS_TIMEOUT_MS must be between 100 and 10000");
+  }
+
   const provider = String(config.AI_PROVIDER ?? "").toLowerCase();
   if (!["", "offline", "openai", "gemini", "ollama"].includes(provider)) {
     throw new Error("AI_PROVIDER must be offline, openai, gemini, or ollama");
@@ -128,6 +133,9 @@ const env = {
 
   AI_EVIDENCE_LIMIT:
     readNumber(process.env.AI_EVIDENCE_LIMIT, 12, "AI_EVIDENCE_LIMIT"),
+
+  READINESS_TIMEOUT_MS:
+    readNumber(process.env.READINESS_TIMEOUT_MS, 1500, "READINESS_TIMEOUT_MS"),
 
   OPENAI_API_KEY:
     process.env.OPENAI_API_KEY || "",

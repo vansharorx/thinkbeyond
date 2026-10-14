@@ -3,13 +3,13 @@ import helmet from "helmet";
 import cors from "cors";
 import compression from "compression";
 import cookieParser from "cookie-parser";
-import morgan from "morgan";
 import rateLimit from "express-rate-limit";
 import routes from "./routes";
 import env from "./config/env";
 
 import { AppError } from "./utils/AppError";
 import { errorHandler } from "./middlewares/error.middleware";
+import { requestContext } from "./utils/request-context";
 
 const app = express();
 
@@ -20,6 +20,10 @@ const apiLimiter = rateLimit({
   max: 200,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: req => new Set([
+    `/api/${env.API_VERSION}/health/live`,
+    `/api/${env.API_VERSION}/health/ready`,
+  ]).has(req.path),
   message: {
     success: false,
     message: "Too many requests, please try again later.",
@@ -27,6 +31,8 @@ const apiLimiter = rateLimit({
 });
 
 // global middlewares
+app.use(requestContext);
+
 app.use(helmet());
 
 app.use(
@@ -34,7 +40,7 @@ app.use(
     origin: env.CORS_ORIGIN.split(",").map(origin => origin.trim()).filter(Boolean),
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Request-Id"],
   })
 );
 
@@ -47,8 +53,6 @@ app.use(cookieParser());
 app.use(express.json({ limit: "1mb" }));
 
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
-
-app.use(morgan("dev"));
 
 // root route
 app.use(`/api/${env.API_VERSION}`, routes);
