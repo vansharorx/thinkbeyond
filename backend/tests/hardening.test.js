@@ -8,6 +8,7 @@ const { execFileSync } = require('node:child_process');
 const {
   getRepositoryRootPath,
   validateRepositoryId,
+  saveRepositoryExplorerState,
 } = require('../dist/services/repository-explorer-state.service.js');
 
 test('validateRepositoryId rejects path traversal input', () => {
@@ -147,4 +148,94 @@ test('production repository routes reject missing and invalid bearer tokens', ()
   });
 
   assert.deepEqual(JSON.parse(output.trim().split(/\r?\n/).pop()), { missing: 401, invalid: 401 });
+});
+
+test('saveRepositoryExplorerState replaces an existing snapshot without losing the previous valid state', async () => {
+  const repositoryId = 'snapshot-replacement-test';
+  const root = getRepositoryRootPath(repositoryId);
+  const state = (summaryName) => ({
+    repositoryId,
+    repositoryPath: root,
+    summary: { name: summaryName },
+    knowledge: {},
+    workspaces: [{
+      name: 'workspace',
+      relativePath: '.',
+      globalSymbolTable: new Map(),
+      sourceFiles: [],
+    }],
+  });
+
+  await saveRepositoryExplorerState(state('first'));
+  await saveRepositoryExplorerState(state('second'));
+  const loaded = await fs.readFile(path.join(root, 'analysis.json'), 'utf8');
+  assert.equal(JSON.parse(loaded).summary.name, 'second');
+  assert.equal(await fs.access(`${path.join(root, 'analysis.json')}.previous`).then(() => true).catch(() => false), false);
+  await fs.rm(root, { recursive: true, force: true });
+});
+
+test('loadRepositoryExplorerState recovers a valid backup after interrupted replacement', async () => {
+  const repositoryId = 'snapshot-backup-recovery-test';
+  const root = getRepositoryRootPath(repositoryId);
+  const snapshotPath = path.join(root, 'analysis.json');
+  const backupPath = `${snapshotPath}.previous`;
+  const backup = {
+    repositoryId,
+    repositoryPath: root,
+    summary: { recovered: true },
+    knowledge: {},
+    workspaces: [],
+  };
+
+  await fs.mkdir(root, { recursive: true });
+  await fs.writeFile(snapshotPath, '{invalid', 'utf8');
+  await fs.writeFile(backupPath, JSON.stringify(backup), 'utf8');
+  const { loadRepositoryExplorerState } = require('../dist/services/repository-explorer-state.service.js');
+  const recovered = await loadRepositoryExplorerState(repositoryId);
+
+  assert.equal(recovered.summary.recovered, true);
+  await fs.rm(root, { recursive: true, force: true });
+});
+
+test('snapshot backup cleanup failure preserves the installed snapshot and logs the failure', async () => {
+  const repositoryId = 'snapshot-cleanup-failure-test';
+  const root = getRepositoryRootPath(repositoryId);
+  const snapshotPath = path.join(root, 'analysis.json');
+  const originalRm = fs.rm;
+  const originalWarn = console.warn;
+  let backupCleanupCalls = 0;
+  const warnings = [];
+
+  await originalRm(root, { recursive: true, force: true });
+
+  fs.rm = async (target, options) => {
+    if (String(target).endsWith('.previous')) {
+      backupCleanupCalls += 1;
+      if (backupCleanupCalls === 3) {
+        throw new Error('simulated backup cleanup failure');
+      }
+    }
+    return originalRm(target, options);
+  };
+  console.warn = (...args) => warnings.push(args.join(' '));
+
+  const state = (name) => ({
+    repositoryId,
+    repositoryPath: root,
+    summary: { name },
+    knowledge: {},
+    workspaces: [{ name: 'workspace', relativePath: '.', globalSymbolTable: new Map(), sourceFiles: [] }],
+  });
+
+  try {
+    await saveRepositoryExplorerState(state('first'));
+    await saveRepositoryExplorerState(state('second'));
+    assert.equal(JSON.parse(await fs.readFile(snapshotPath, 'utf8')).summary.name, 'second');
+    assert.equal(warnings.some(message => message.includes('repository.snapshot_backup_cleanup_failed')), true);
+    assert.equal(await fs.access(root).then(() => true), true);
+  } finally {
+    fs.rm = originalRm;
+    console.warn = originalWarn;
+    await originalRm(root, { recursive: true, force: true });
+  }
 });

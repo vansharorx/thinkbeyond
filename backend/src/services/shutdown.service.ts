@@ -22,6 +22,7 @@ export const shutdownServer = async (
 ): Promise<{ timedOut: boolean; disconnectFailed: boolean }> => {
   let timedOut = false;
   let disconnectFailed = false;
+  const shutdownStartedAt = Date.now();
 
   const closePromise = new Promise<void>((resolve, reject) => {
     server.close(error => {
@@ -44,8 +45,18 @@ export const shutdownServer = async (
     server.closeAllConnections?.();
   } finally {
     try {
-      await disconnect();
-    } catch {
+      const remainingMs = Math.max(0, timeoutMs - (Date.now() - shutdownStartedAt));
+      await Promise.race([
+        disconnect(),
+        new Promise<never>((_, reject) => {
+          const timeout = setTimeout(() => reject(new Error("shutdown cleanup timeout")), remainingMs);
+          timeout.unref();
+        }),
+      ]);
+    } catch (error) {
+      if (error instanceof Error && error.message === "shutdown cleanup timeout") {
+        timedOut = true;
+      }
       disconnectFailed = true;
     }
   }

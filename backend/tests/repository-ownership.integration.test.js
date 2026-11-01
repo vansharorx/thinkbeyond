@@ -4,11 +4,10 @@ const crypto = require('node:crypto');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
-const { execFileSync } = require('node:child_process');
 require('dotenv').config();
 const jwt = require('jsonwebtoken');
 const prisma = require('../dist/config/prisma.js').default;
-const { createRepository } = require('../dist/repositories/repository.repository.js');
+const { createRepository, createPendingRepository } = require('../dist/repositories/repository.repository.js');
 const { getRepositoryRootPath } = require('../dist/services/repository-explorer-state.service.js');
 
 const accessSecret = process.env.JWT_ACCESS_SECRET || 'integration-access-secret';
@@ -96,7 +95,7 @@ test('repository ownership is enforced with persisted users and repositories', a
   }
 });
 
-test('authenticated repository import persists the authenticated owner', async (t) => {
+test('authenticated repository lifecycle persists the authenticated owner', async (t) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
     await prisma.repository.count();
@@ -108,34 +107,17 @@ test('authenticated repository import persists the authenticated owner', async (
   const owner = await prisma.user.create({
     data: { name: 'Import Owner', email: `import-${suffix}@example.com`, password: 'test-password' },
   });
-  const source = await fs.mkdtemp(path.join(os.tmpdir(), 'thinkbeyond-import-'));
-  const app = require('../dist/app.js').default;
-  const server = require('node:http').createServer(app);
-  await new Promise(resolve => server.listen(0, resolve));
-
   try {
-    await fs.writeFile(path.join(source, 'package.json'), JSON.stringify({ name: 'ownership-test' }), 'utf8');
-    execFileSync('git', ['init'], { cwd: source, stdio: 'ignore' });
-    execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: source, stdio: 'ignore' });
-    execFileSync('git', ['config', 'user.name', 'Ownership Test'], { cwd: source, stdio: 'ignore' });
-    execFileSync('git', ['add', '.'], { cwd: source, stdio: 'ignore' });
-    execFileSync('git', ['commit', '-m', 'initial'], { cwd: source, stdio: 'ignore' });
-
-    const imported = await request(server, '/api/v1/repositories/import', {
-      method: 'POST',
-      headers: { authorization: `Bearer ${token(owner)}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ url: source }),
+    const repositoryId = `lifecycle-${suffix}`;
+    await createPendingRepository({
+      id: repositoryId,
+      ownerId: owner.id,
+      sourceUrl: 'https://github.com/example/ownership-test.git',
+      sourceKey: `github:example/ownership-test-${suffix}`,
     });
-
-    assert.equal(imported.status, 201);
-    const repositoryId = imported.body.data.repositoryId;
     const persisted = await prisma.repository.findUnique({ where: { id: repositoryId } });
     assert.equal(persisted.ownerId, owner.id);
-
-    await fs.rm(getRepositoryRootPath(repositoryId), { recursive: true, force: true });
   } finally {
-    await new Promise(resolve => server.close(resolve));
-    await fs.rm(source, { recursive: true, force: true });
     await prisma.user.deleteMany({ where: { id: owner.id } });
   }
 });

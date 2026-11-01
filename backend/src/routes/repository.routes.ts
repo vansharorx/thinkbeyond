@@ -20,9 +20,12 @@ import {
   explainRepositorySymbol,
   reviewRepositoryArchitecture,
   generateRepositoryDocumentation,
+  getRepositoryStatus,
+  retryRepository,
 } from "../controllers/repository.controller";
 import { authenticate } from "../middlewares/auth.middleware";
 import { authorizeRepository } from "../middlewares/repository-ownership.middleware";
+import { requireReadyRepository } from "../middlewares/repository-ready.middleware";
 
 const router = Router();
 
@@ -32,7 +35,21 @@ router.post(
   importRepository
 );
 
-router.use("/:id", authenticate, authorizeRepository);
+router.get(
+  "/:id/status",
+  authenticate,
+  authorizeRepository,
+  getRepositoryStatus
+);
+
+router.post(
+  "/:id/retry",
+  authenticate,
+  authorizeRepository,
+  retryRepository
+);
+
+router.use("/:id", authenticate, authorizeRepository, requireReadyRepository);
 
 router.get(
   "/:id/tree",

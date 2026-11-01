@@ -18,6 +18,20 @@ export interface LoginResponse {
   refreshToken: string;
 }
 
+export interface RepositoryLifecycleStatus {
+  id: string;
+  status: 'pending' | 'cloning' | 'analyzing' | 'ready' | 'failed';
+  phase: string;
+  attemptCount: number;
+  lastAttemptAt?: string | null;
+  lastErrorCode?: string | null;
+  lastErrorMessage?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 function getAuthHeaders(): Record<string, string> {
   const token = localStorage.getItem('accessToken');
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -70,9 +84,18 @@ function jsonBody(value: Record<string, unknown>) {
 
 export const repositoryApi = {
   importRepository: async (url: string) =>
-    request<{ id?: string; repositoryId?: string; url?: string }>(`/import`, {
+    request<RepositoryLifecycleStatus>(`/import`, {
       method: 'POST',
       body: jsonBody({ url }),
+    }),
+
+  getStatus: async (repositoryId: RepositoryId) =>
+    request<RepositoryLifecycleStatus>(`/${repositoryId}/status`),
+
+  retry: async (repositoryId: RepositoryId) =>
+    request<RepositoryLifecycleStatus>(`/${repositoryId}/retry`, {
+      method: 'POST',
+      body: JSON.stringify({}),
     }),
 
   getOverview: async (repositoryId: RepositoryId) =>

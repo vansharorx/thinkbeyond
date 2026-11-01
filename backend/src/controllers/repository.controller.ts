@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { successResponse } from "../utils/apiResponse";
-import { importRepositoryService } from "../services/repository.service";
 import { AppError } from "../utils/AppError";
 import { loadRepositoryExplorerState } from "../services/repository-explorer-state.service";
 import { buildRepositoryTree } from "../services/repository-tree.service";
@@ -52,6 +51,11 @@ import { explainSymbol } from "../ai/chat/explain-symbol.service";
 import { reviewArchitecture } from "../ai/chat/architecture-review.service";
 import { generateDocumentation } from "../ai/chat/documentation.service";
 import { AuthRequest } from "../middlewares/auth.middleware";
+import {
+  getRepositoryLifecycle,
+  queueRepositoryImport,
+  retryRepositoryImport,
+} from "../services/repository-lifecycle.service";
 
 export const importRepository = asyncHandler(
   async (req: AuthRequest, res: Response) => {
@@ -61,15 +65,33 @@ export const importRepository = asyncHandler(
       throw new AppError("Authorization token is missing", 401);
     }
 
-    const repository =
-      await importRepositoryService(url, req.user.userId);
+    const repository = await queueRepositoryImport(url, req.user.userId);
 
-    return res.status(201).json(
+    return res.status(repository.created ? 202 : 200).json(
       successResponse(
-        "Repository imported successfully",
-        repository
+        repository.created ? "Repository import accepted" : "Repository import already exists",
+        repository.repository
       )
     );
+  }
+);
+
+export const getRepositoryStatus = asyncHandler(
+  async (req: Request, res: Response) => {
+    const repositoryId = firstString(req.params.id);
+    const status = await getRepositoryLifecycle(repositoryId);
+    if (!status) throw new AppError("Repository not found", 404);
+    return res.json(successResponse("Repository status loaded successfully", status));
+  }
+);
+
+export const retryRepository = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    if (!req.user) throw new AppError("Authorization token is missing", 401);
+    const repositoryId = firstString(req.params.id);
+    const status = await retryRepositoryImport(repositoryId, req.user.userId);
+    if (!status) throw new AppError("Repository not found", 404);
+    return res.status(202).json(successResponse("Repository retry accepted", status));
   }
 );
 

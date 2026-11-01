@@ -5,6 +5,7 @@ import { logger } from "./utils/logger";
 import prisma from "./config/prisma";
 import { checkDatabaseReadiness } from "./services/health.service";
 import { createShutdownHandler } from "./services/shutdown.service";
+import { drainRepositoryWorkers, recoverInterruptedRepositories } from "./services/repository-lifecycle.service";
 
 export const startServer = async () => {
   const readiness = await checkDatabaseReadiness();
@@ -14,6 +15,8 @@ export const startServer = async () => {
     process.exitCode = 1;
     return null;
   }
+
+  await recoverInterruptedRepositories();
 
   const server = http.createServer(app);
   await new Promise<void>((resolve, reject) => {
@@ -25,12 +28,20 @@ export const startServer = async () => {
   });
   logger.info("server.started", { port: env.PORT });
 
-  const shutdown = createShutdownHandler(server, () => prisma.$disconnect());
+  let workerShutdownTimedOut = false;
+  const shutdown = createShutdownHandler(server, async () => {
+    const workerResult = await drainRepositoryWorkers(8000);
+    workerShutdownTimedOut = workerResult.timedOut;
+    if (workerResult.timedOut) {
+      logger.warn("repository.lifecycle_shutdown_timeout");
+    }
+    await prisma.$disconnect();
+  });
   const handleSignal = (signal: string) => {
     logger.info("server.shutdown_requested", { signal });
     void shutdown().then(result => {
       logger.info("server.stopped", { timedOut: result.timedOut });
-      process.exitCode = result.timedOut || result.disconnectFailed ? 1 : 0;
+      process.exitCode = result.timedOut || result.disconnectFailed || workerShutdownTimedOut ? 1 : 0;
     }).catch(error => {
       logger.error("server.shutdown_failed", { errorName: error instanceof Error ? error.name : "UnknownError" });
       process.exitCode = 1;

@@ -26,5 +26,10 @@ export const authorizeRepository = async (
     throw new AppError("Repository not found", 404);
   }
 
+  req.repository = {
+    id: repository.id,
+    status: repository.status,
+  };
+
   return next();
 };

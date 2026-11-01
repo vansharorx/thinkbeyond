@@ -1,6 +1,6 @@
 import { BrowserRouter, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { authApi, repositoryApi, getRepositoryIdFromPayload } from './api/repositoryApi';
+import { authApi, repositoryApi, getRepositoryIdFromPayload, type RepositoryLifecycleStatus } from './api/repositoryApi';
 import './App.css';
 
 const DEFAULT_REPOSITORY_ID = '6418371f-9631-4f9f-aaa7-b6629735f49b';
@@ -24,8 +24,14 @@ function RepositoryWorkspace() {
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
   const [repoLabel, setRepoLabel] = useState(repositoryId);
   const [searchText, setSearchText] = useState('');
+  const [importUrl, setImportUrl] = useState('');
   const [searchResults, setSearchResults] = useState<Array<Record<string, unknown>>>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [lifecycleStatus, setLifecycleStatus] = useState<RepositoryLifecycleStatus | null>(null);
+  const [pollGeneration, setPollGeneration] = useState(0);
+  const [retryLoading, setRetryLoading] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -56,20 +62,48 @@ function RepositoryWorkspace() {
     };
   }, [repositoryId]);
 
+  useEffect(() => {
+    let active = true;
+    let timer: number | undefined;
+
+    const loadStatus = async () => {
+      try {
+        const status = await repositoryApi.getStatus(repositoryId);
+        if (!active) return;
+        setLifecycleStatus(status);
+        if (status.status === 'pending' || status.status === 'cloning' || status.status === 'analyzing') {
+          timer = window.setTimeout(() => void loadStatus(), 1500);
+        }
+      } catch {
+        if (active) setLifecycleStatus(null);
+      }
+    };
+
+    void loadStatus();
+    return () => {
+      active = false;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [repositoryId, pollGeneration]);
+
   const handleRepositoryImport = async () => {
-    const value = searchText.trim();
+    const value = importUrl.trim();
     if (!value) {
       return;
     }
 
+    setImportLoading(true);
+    setImportError(null);
     try {
       const imported = await repositoryApi.importRepository(value);
-      const importedId = getRepositoryIdFromPayload(imported) ?? repositoryId;
+      const importedId = getRepositoryIdFromPayload(imported) ?? imported.id ?? repositoryId;
       if (importedId) {
         navigate(`/repositories/${importedId}/overview`, { replace: true });
       }
     } catch (error) {
-      console.error('Repository import failed', error);
+      setImportError(error instanceof Error ? error.message : 'Repository import failed.');
+    } finally {
+      setImportLoading(false);
     }
   };
 
@@ -155,11 +189,50 @@ function RepositoryWorkspace() {
                 void handleGlobalSearch(nextValue);
               }}
             />
-            <button type="button" onClick={() => void handleRepositoryImport()}>
-              Open repo
-            </button>
+            <div className="import-control">
+              <input
+                aria-label="GitHub repository URL"
+                type="url"
+                value={importUrl}
+                placeholder="https://github.com/org/repository"
+                onChange={(event) => setImportUrl(event.target.value)}
+              />
+              <button type="button" disabled={importLoading} onClick={() => void handleRepositoryImport()}>
+                {importLoading ? 'Queueing...' : 'Import repo'}
+              </button>
+            </div>
           </div>
         </header>
+
+        {lifecycleStatus && lifecycleStatus.status !== 'ready' ? (
+          <section className={`lifecycle-banner ${lifecycleStatus.status === 'failed' ? 'failed' : ''}`} aria-live="polite">
+            <div>
+              <strong>{lifecycleStatus.status === 'failed' ? 'Repository analysis failed' : 'Repository analysis in progress'}</strong>
+              <span>{lifecycleStatus.phase}</span>
+            </div>
+            {lifecycleStatus.status === 'failed' ? (
+              <button
+                type="button"
+                className="primary-button"
+                disabled={retryLoading}
+                onClick={() => {
+                  setRetryLoading(true);
+                  setImportError(null);
+                  void repositoryApi.retry(repositoryId)
+                    .then(status => {
+                      setLifecycleStatus(status);
+                      setPollGeneration(value => value + 1);
+                    })
+                    .catch(error => setImportError(error instanceof Error ? error.message : 'Retry failed.'))
+                    .finally(() => setRetryLoading(false));
+                }}
+              >
+                {retryLoading ? 'Retrying...' : 'Retry analysis'}
+              </button>
+            ) : null}
+          </section>
+        ) : null}
+        {importError ? <p className="import-error" role="alert">{importError}</p> : null}
 
         {searchText.trim() ? (
           <section className="global-search-panel" aria-live="polite">

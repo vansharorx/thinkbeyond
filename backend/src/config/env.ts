@@ -41,6 +41,16 @@ const ensureConfiguration = (config: Record<string, string | number | undefined>
     throw new Error("AI_EVIDENCE_LIMIT must be between 1 and 100");
   }
 
+  const leaseTimeoutMs = Number(config.REPOSITORY_LEASE_TIMEOUT_MS);
+  if (!Number.isFinite(leaseTimeoutMs) || leaseTimeoutMs < 1000 || leaseTimeoutMs > 3600000) {
+    throw new Error("REPOSITORY_LEASE_TIMEOUT_MS must be between 1000 and 3600000");
+  }
+
+  const queueMax = Number(config.REPOSITORY_QUEUE_MAX);
+  if (!Number.isInteger(queueMax) || queueMax < 1 || queueMax > 10000) {
+    throw new Error("REPOSITORY_QUEUE_MAX must be between 1 and 10000");
+  }
+
   const readinessTimeoutMs = Number(config.READINESS_TIMEOUT_MS);
   if (!Number.isFinite(readinessTimeoutMs) || readinessTimeoutMs < 100 || readinessTimeoutMs > 10000) {
     throw new Error("READINESS_TIMEOUT_MS must be between 100 and 10000");
@@ -136,6 +146,12 @@ const env = {
 
   READINESS_TIMEOUT_MS:
     readNumber(process.env.READINESS_TIMEOUT_MS, 1500, "READINESS_TIMEOUT_MS"),
+
+  REPOSITORY_LEASE_TIMEOUT_MS:
+    readNumber(process.env.REPOSITORY_LEASE_TIMEOUT_MS, 60000, "REPOSITORY_LEASE_TIMEOUT_MS"),
+
+  REPOSITORY_QUEUE_MAX:
+    readNumber(process.env.REPOSITORY_QUEUE_MAX, 100, "REPOSITORY_QUEUE_MAX"),
 
   OPENAI_API_KEY:
     process.env.OPENAI_API_KEY || "",

@@ -44,6 +44,7 @@
 .repo-inline { display: flex; align-items: center; gap: 10px; color: var(--color-wine); font-family: "IBM Plex Mono", "SFMono-Regular", monospace; font-size: 0.8rem; overflow-wrap: anywhere; }
 .status-dot { width: 9px; height: 9px; flex: 0 0 auto; border-radius: 50%; background: var(--color-success); box-shadow: 0 0 0 5px rgba(56, 118, 92, 0.12); }
 .searchbar { display: flex; align-items: center; gap: 10px; width: min(620px, 55%); }
+.import-control { display: flex; align-items: center; gap: 8px; width: min(560px, 100%); }
 .searchbar input, .field-stack input, .field-label + input, textarea, .graph-select, .auth-form input { width: 100%; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-cream-soft); color: var(--color-ink); padding: 11px 12px; transition: border-color var(--motion), box-shadow var(--motion), background var(--motion); }
 .searchbar input { font-family: "IBM Plex Mono", "SFMono-Regular", monospace; font-size: 0.72rem; }
 .searchbar input:focus, .field-stack input:focus, .field-label + input:focus, textarea:focus, .graph-select:focus, .auth-form input:focus { outline: none; border-color: var(--color-camel); box-shadow: 0 0 0 3px rgba(193, 154, 114, 0.18); }
@@ -117,9 +118,14 @@ textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
 .auth-form label { display: block; margin: 15px 0 7px; color: var(--color-muted); font-size: 0.75rem; font-weight: 700; }
 .auth-form button { width: 100%; margin-top: 22px; }
 .auth-form [role="alert"] { margin: 14px 0 0; color: var(--color-danger); font-size: 0.8rem; }
+.lifecycle-banner { display: flex; align-items: center; justify-content: space-between; gap: 16px; max-width: 1480px; margin: 18px auto 0; padding: 14px 16px; border: 1px solid var(--color-camel); border-left-width: 4px; border-radius: 9px; background: rgba(229, 208, 182, 0.35); color: var(--color-wine); }
+.lifecycle-banner div { display: flex; flex-direction: column; gap: 4px; }
+.lifecycle-banner span { color: var(--color-muted); font-family: "IBM Plex Mono", monospace; font-size: 0.72rem; }
+.lifecycle-banner.failed { border-color: var(--color-danger); background: rgba(161, 60, 77, 0.08); }
+.import-error { max-width: 1480px; margin: 12px auto 0; color: var(--color-danger); font-size: 0.8rem; }
 @keyframes rise-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes dash-flow { to { stroke-dashoffset: -100; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: 0.01ms !important; } }
 @media (max-width: 1080px) { .app-shell { grid-template-columns: 220px minmax(0, 1fr); } .page-grid, .two-column-page, .graph-layout, .compact-grid { grid-template-columns: 1fr; } }
-@media (max-width: 760px) { .app-shell { display: block; } .sidebar { position: relative; height: auto; padding: 16px; } .brand-block { padding-bottom: 14px; } .nav-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); } .context-box { margin-top: 0; } .content-panel { padding: 18px 14px 32px; } .topbar { align-items: stretch; flex-direction: column; gap: 14px; } .searchbar { width: 100%; } .stats-grid, .stats-grid.compact, .list-grid { grid-template-columns: 1fr 1fr; } .panel-card, .global-search-panel { padding: 16px; } }
-@media (max-width: 480px) { .nav-list, .stats-grid, .stats-grid.compact, .list-grid { grid-template-columns: 1fr; } .searchbar { align-items: stretch; flex-direction: column; } .searchbar button { width: 100%; } .result-item { align-items: flex-start; flex-direction: column; gap: 6px; } .auth-page { padding: 16px; } .auth-form { padding: 24px; } }
+@media (max-width: 760px) { .app-shell { display: block; } .sidebar { position: relative; height: auto; padding: 16px; } .brand-block { padding-bottom: 14px; } .nav-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); } .context-box { margin-top: 0; } .content-panel { padding: 18px 14px 32px; } .topbar { align-items: stretch; flex-direction: column; gap: 14px; } .searchbar, .import-control { width: 100%; } .stats-grid, .stats-grid.compact, .list-grid { grid-template-columns: 1fr 1fr; } .panel-card, .global-search-panel { padding: 16px; } }
+@media (max-width: 480px) { .nav-list, .stats-grid, .stats-grid.compact, .list-grid { grid-template-columns: 1fr; } .searchbar, .import-control { align-items: stretch; flex-direction: column; } .searchbar button, .import-control button { width: 100%; } .result-item { align-items: flex-start; flex-direction: column; gap: 6px; } .auth-page { padding: 16px; } .auth-form { padding: 24px; } }

@@ -8,6 +8,10 @@ export interface AuthRequest extends Request {
     userId: string;
     email: string;
   };
+  repository?: {
+    id: string;
+    status: string;
+  };
 }
 
 export const authenticate = (

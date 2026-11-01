@@ -1,5 +1,8 @@
 import fs from "fs/promises";
 import path from "path";
+import { randomUUID } from "node:crypto";
+import prisma from "../config/prisma";
+import { logger } from "../utils/logger";
 
 import type { WorkspaceAnalysis } from "./workspace.service";
 import type { SourceFile } from "./source-indexer.service";
@@ -104,8 +107,34 @@ export const ensureRepositoryRootPath = async (
 export const getRepositorySnapshotPath = (repositoryId: string): string =>
   path.join(getRepositoryRootPath(repositoryId), "analysis.json");
 
+export const ensureRepositoryAttemptPath = async (
+  repositoryId: string,
+  attemptId: string
+): Promise<string> => {
+  if (!/^[A-Za-z0-9-]+$/.test(attemptId)) {
+    throw new Error("Repository attempt ID contains invalid characters");
+  }
+
+  const repositoryRoot = await ensureRepositoryRootPath(repositoryId, true);
+  const attemptPath = path.join(repositoryRoot, "attempts", attemptId);
+  await fs.mkdir(attemptPath, { recursive: true });
+  const canonicalAttemptPath = await fs.realpath(attemptPath);
+  if (!canonicalAttemptPath.startsWith(`${repositoryRoot}${path.sep}`)) {
+    throw new Error("Repository attempt path is outside the repository root");
+  }
+  return canonicalAttemptPath;
+};
+
+export const getRepositoryAttemptPath = (repositoryId: string, attemptId: string): string => {
+  if (!/^[A-Za-z0-9-]+$/.test(attemptId)) {
+    throw new Error("Repository attempt ID contains invalid characters");
+  }
+  return path.join(getRepositoryRootPath(repositoryId), "attempts", attemptId);
+};
+
 export const saveRepositoryExplorerState = async (
-  state: RepositoryExplorerState
+  state: RepositoryExplorerState,
+  options: { storagePath?: string; assertActive?: () => void } = {}
 ): Promise<void> => {
   const snapshot: SerializedRepositoryExplorerState = {
     repositoryId: state.repositoryId,
@@ -115,13 +144,42 @@ export const saveRepositoryExplorerState = async (
     workspaces: state.workspaces.map(serializeWorkspaceAnalysis),
   };
 
-  await ensureRepositoryRootPath(state.repositoryId, true);
+  options.assertActive?.();
+  const storagePath = options.storagePath ?? await ensureRepositoryRootPath(state.repositoryId, true);
 
-  await fs.writeFile(
-    getRepositorySnapshotPath(state.repositoryId),
-    JSON.stringify(snapshot, null, 2),
-    "utf-8"
-  );
+  const snapshotPath = path.join(storagePath, "analysis.json");
+  const temporarySnapshotPath = `${snapshotPath}.${randomUUID()}.tmp`;
+  const backupSnapshotPath = `${snapshotPath}.previous`;
+
+  try {
+    options.assertActive?.();
+    await fs.writeFile(temporarySnapshotPath, JSON.stringify(snapshot, null, 2), "utf-8");
+    let movedPrevious = false;
+    try {
+      await fs.access(snapshotPath);
+      await fs.rm(backupSnapshotPath, { force: true });
+      await fs.rename(snapshotPath, backupSnapshotPath);
+      movedPrevious = true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+
+    try {
+      options.assertActive?.();
+      await fs.rename(temporarySnapshotPath, snapshotPath);
+    } catch (error) {
+      if (movedPrevious) {
+        await fs.rename(backupSnapshotPath, snapshotPath).catch(() => undefined);
+      }
+      throw error;
+    }
+
+    await fs.rm(backupSnapshotPath, { force: true }).catch(error => {
+      logger.warn("repository.snapshot_backup_cleanup_failed", { repositoryId: state.repositoryId, errorName: error instanceof Error ? error.name : "UnknownError" });
+    });
+  } finally {
+    await fs.rm(temporarySnapshotPath, { force: true }).catch(() => undefined);
+  }
 };
 
 export const loadRepositoryExplorerState = async (
@@ -130,12 +188,32 @@ export const loadRepositoryExplorerState = async (
   try {
     const safeRepositoryId = validateRepositoryId(repositoryId);
     const canonicalRepositoryRoot = await ensureRepositoryRootPath(safeRepositoryId, false);
-    const raw = await fs.readFile(
-      getRepositorySnapshotPath(safeRepositoryId),
-      "utf-8"
-    );
+    let activeAttemptId: string | null = null;
+    try {
+      const lifecycle = await prisma.repository.findUnique({
+        where: { id: safeRepositoryId },
+        select: { activeAttemptId: true },
+      });
+      activeAttemptId = lifecycle?.activeAttemptId ?? null;
+    } catch {
+      activeAttemptId = null;
+    }
 
-    const parsed = JSON.parse(raw) as SerializedRepositoryExplorerState;
+    const canonicalStoragePath = activeAttemptId
+      ? await fs.realpath(getRepositoryAttemptPath(safeRepositoryId, activeAttemptId))
+      : canonicalRepositoryRoot;
+    if (canonicalStoragePath !== canonicalRepositoryRoot && !canonicalStoragePath.startsWith(`${canonicalRepositoryRoot}${path.sep}`)) {
+      return null;
+    }
+    const snapshotPath = path.join(canonicalStoragePath, "analysis.json");
+    const backupSnapshotPath = `${snapshotPath}.previous`;
+    let parsed: SerializedRepositoryExplorerState;
+    try {
+      parsed = JSON.parse(await fs.readFile(snapshotPath, "utf-8")) as SerializedRepositoryExplorerState;
+    } catch {
+      parsed = JSON.parse(await fs.readFile(backupSnapshotPath, "utf-8")) as SerializedRepositoryExplorerState;
+      await fs.rename(backupSnapshotPath, snapshotPath).catch(() => undefined);
+    }
 
     if (parsed.repositoryId !== safeRepositoryId) {
       return null;
@@ -144,7 +222,7 @@ export const loadRepositoryExplorerState = async (
     return {
       repositoryId: safeRepositoryId,
       // The snapshot is data, not an authority for filesystem locations.
-      repositoryPath: canonicalRepositoryRoot,
+      repositoryPath: canonicalStoragePath,
       summary: parsed.summary,
       knowledge: parsed.knowledge,
       workspaces: parsed.workspaces.map(deserializeWorkspaceAnalysis),

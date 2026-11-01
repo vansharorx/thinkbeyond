@@ -15,3 +15,11 @@ Requests receive an `X-Request-Id` response header. A valid incoming value up to
 ## Shutdown
 
 The server handles `SIGINT` and `SIGTERM` by stopping new connections, allowing active requests to finish within the shutdown deadline, disconnecting Prisma, and then exiting. Repeated signals share the same cleanup operation.
+
+## Repository analysis lifecycle
+
+Repository imports accept only canonical HTTPS GitHub URLs. An import creates an owner-scoped lifecycle row before cloning and returns `202` with the repository lifecycle state. Status values are `pending`, `cloning`, `analyzing`, `ready`, and `failed`; phases describe the actual stage without percentage estimates.
+
+Use `GET /api/v1/repositories/:id/status` to inspect an owned import and `POST /api/v1/repositories/:id/retry` to retry an owned failed import. Existing intelligence endpoints return a conflict until the repository is `ready`.
+
+Equivalent owner/source requests converge through the database uniqueness constraint. Active work is bounded to two in-process analyses, with a conditional database claim preventing multiple processes from analyzing the same row. Startup marks interrupted active jobs as failed with `PROCESS_INTERRUPTED`. Legacy repository rows default to `ready` and nullable source fields; legacy filesystem snapshots without an ownership row remain inaccessible.
